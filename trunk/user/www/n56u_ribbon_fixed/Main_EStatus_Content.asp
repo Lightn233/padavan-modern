@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,18 +11,20 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
+<script src="/ui/core.js?v=1"></script>
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
 var id_timer_mib = 0;
 var eth_port_id = 0;
 
-$j(window).bind('hashchange', function(){
+$j(window).on('hashchange', function(){
 	update_page();
 	update_tabs();
 	set_mib_data();

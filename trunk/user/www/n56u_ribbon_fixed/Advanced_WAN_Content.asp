@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#> - <#menu5_3_1#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,19 +11,21 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/engage.itoggle.css">
+
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-<script type="text/javascript" src="/bootstrap/js/engage.itoggle.min.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
+
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
-<script type="text/javascript" src="/help_b.js"></script>
+
 <script>
 var $j = jQuery.noConflict();
 
@@ -58,7 +63,15 @@ if(m_dhcp.length > 0){
 var isMenuopen = 0;
 var clients_info = getclient(1,0);
 var sort_mode = parseInt(localStorage.getItem('sortMode'));
+var wanIssueTimer = null;
+function updateWanIssue(){
+    $j.ajax({url:"/status_wanlink.asp", dataType:"script", cache:false, timeout:4000,
+        success:function(){renderWanIssue(document.getElementById("wan_issue"), wanlink_status(), wanlink_issue());},
+        complete:function(){wanIssueTimer=setTimeout(updateWanIssue, 3000);}
+    });
+}
 function initial(){
+    updateWanIssue();
 	show_banner(1);
 	show_menu(5,4,1);
 	show_footer();
@@ -536,7 +549,7 @@ function change_wan_dhcp_enable(wan_type){
 		
 		inputCtrl(document.form.x_DHCPClient[0], 1);
 		inputCtrl(document.form.x_DHCPClient[1], 1);
-		$j('input[name="x_DHCPClient"]').removeAttr('disabled');
+		$j('input[name="x_DHCPClient"]').prop("disabled", false);
 		$j('#x_DHCPClient_on_of').iClickable(1);
 		
 		set_wan_dhcp_auto(dhcp_auto);
@@ -547,7 +560,7 @@ function change_wan_dhcp_enable(wan_type){
 		
 		inputCtrl(document.form.x_DHCPClient[0], 0);
 		inputCtrl(document.form.x_DHCPClient[1], 0);
-		$j('input[name="x_DHCPClient"]').attr('disabled','disabled');
+		$j('input[name="x_DHCPClient"]').prop("disabled", true);
 		$j('#x_DHCPClient_on_of').iClickable(0);
 		
 		set_wan_dhcp_auto(0);
@@ -558,7 +571,7 @@ function change_wan_dhcp_enable(wan_type){
 		
 		inputCtrl(document.form.x_DHCPClient[0], 0);
 		inputCtrl(document.form.x_DHCPClient[1], 0);
-		$j('input[name="x_DHCPClient"]').attr('disabled','disabled');
+		$j('input[name="x_DHCPClient"]').prop("disabled", true);
 		$j('#x_DHCPClient_on_of').iClickable(0);
 		
 		set_wan_dhcp_auto(1);
@@ -569,13 +582,13 @@ function change_wan_dns_enable(wan_type){
 	if(wan_type == "static"){
 		inputCtrl(document.form.wan_dnsenable_x[0], 0);
 		inputCtrl(document.form.wan_dnsenable_x[1], 0);
-		$j('input[name="wan_dnsenable_x"]').attr('disabled','disabled');
+		$j('input[name="wan_dnsenable_x"]').prop("disabled", true);
 		$j('#wan_dnsenable_x_on_of').iClickable(0);
 	}
 	else{
 		inputCtrl(document.form.wan_dnsenable_x[0], 1);
 		inputCtrl(document.form.wan_dnsenable_x[1], 1);
-		$j('input[name="wan_dnsenable_x"]').removeAttr('disabled');
+		$j('input[name="wan_dnsenable_x"]').prop("disabled", false);
 		$j('#wan_dnsenable_x_on_of').iClickable(1);
 	}
 }
@@ -925,6 +938,7 @@ function simplyMAC(fullMAC){
 
     <iframe name="hidden_frame" id="hidden_frame" src="" width="0" height="0" frameborder="0"></iframe>
 
+    <div id="wan_issue" role="status" aria-live="polite" class="alert alert-warning" style="display:none;margin:10px 25px;white-space:normal"></div>
     <form method="post" name="form" id="ruleForm" action="/start_apply.htm" target="hidden_frame">
     <input type="hidden" name="current_page" value="Advanced_WAN_Content.asp">
     <input type="hidden" name="next_page" value="">
@@ -997,11 +1011,10 @@ function simplyMAC(fullMAC){
                                                     <option value="1" <% nvram_match_x("", "hw_nat_mode", "1", "selected"); %>>Offload TCP/UDP for LAN/WLAN</option>
                                                     <option value="2" <% nvram_match_x("", "hw_nat_mode", "2", "selected"); %>>Offload TCP/UDP for LAN</option>
                                                 </select>
-                                                <div class="help-block">硬件 NAT 会绕过软件限速。使用自定义 QoS 前请关闭硬件 NAT；内置 SQM 启用期间会暂停两种加速，保留这里的设置。</div>
                                             </td>
                                         </tr>
                                         <tr id="row_sfe" style="display:none;">
-                                            <th><#WAN_SFE#></a></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,7,28);" onfocus="openTooltip(this,7,28);"><#WAN_SFE#></a></th>
                                             <td>
                                                 <select name="sfe_enable" class="input">
                                                     <option value="0" <% nvram_match_x("", "sfe_enable", "0", "selected"); %>>Disable</option>

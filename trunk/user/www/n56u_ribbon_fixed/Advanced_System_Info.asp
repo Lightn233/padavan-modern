@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,14 +11,16 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-<script type="text/javascript" src="/bootstrap/js/highcharts.js"></script>
-<script type="text/javascript" src="/bootstrap/js/highcharts_theme.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
+<script type="text/javascript" src="/ui/chart.js"></script>
+
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
@@ -113,7 +118,7 @@ var cpu_chart = {
                 x2: 0,
                 y2: 1
             },
-            stops: [[0, Highcharts.getOptions().colors[0]], [1, 'rgba(0,0,0,0)']]
+            stops: [[0, RouterChart.getOptions().colors[0]], [1, 'rgba(0,0,0,0)']]
         },
         data: (prepare_array_chart)()
     },{
@@ -221,7 +226,7 @@ var mem_chart = {
     }]
 };
 
-Highcharts.setOptions({
+RouterChart.setOptions({
     global : {
         useUTC : false
     },
@@ -239,11 +244,12 @@ $j(document).ready(function(){
         showChart(newHash,0);
         return false;
     });
-    arrCharts[0] = new Highcharts.StockChart(cpu_chart);
-    arrCharts[1] = new Highcharts.StockChart(mem_chart);
+    arrCharts[0] = new RouterChart.Chart(cpu_chart);
+    arrCharts[1] = new RouterChart.Chart(mem_chart);
+    showChart(getHash(),1);
 });
 
-$j(window).bind('hashchange', function(){
+$j(window).on('hashchange', function(){
     showChart(getHash(),1);
 });
 
@@ -260,7 +266,7 @@ function showChart(curHash,rdw){
         if(curHash == ('#'+arrHashes[i])){
             $j('#tab_'+arrHashes[i]+'_chart').parents('li').addClass('active');
             $j('#'+arrHashes[i]+'_chart').show();
-            if (rdw)
+            if (rdw && arrCharts[i])
                arrCharts[i].redraw();
         }else{
             $j('#tab_'+arrHashes[i]+'_chart').parents('li').removeClass('active');

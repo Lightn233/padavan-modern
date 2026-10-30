@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,12 +11,14 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/disk_functions.js"></script>
 <script type="text/javascript" src="/client_function.js"></script>
@@ -706,16 +711,16 @@ $j(document).ready(function(){
                 <!--Body content-->
 
                 <div class="row-fluid">
-                    <div class="span2">
-                        <div class="well" style="height: 570px; padding-left: 18px;">
+                    <div class="span12 ui-network-map">
+                        <div class="well" >
                             <div id="tabMenu"></div>
 
-                            <table class="table table-big" style="margin-top: 12px;">
+                            <table class="table table-big" aria-label="网络状态导航">
                                 <tbody>
                                     <tr id="row_internet">
                                         <td width="30%">
                                             <a id="linkInternet" href="/device-map/internet.asp" target="statusframe" style="outline:0;">
-                                                <div id="iconInternet" class="big-icons big-icons-globe" onclick="clickEvent(this);"></div>
+                                                <div id="iconInternet" class="big-icons big-icons-globe" onclick="clickEvent(this);"></div><span class="ui-map-label">互联网</span>
                                             </a>
                                             <div id="overDiv" style="position:absolute; visibility:hidden; z-index:1000;"></div>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="internetStatus" style="padding-left: 3px;"></div></div>
@@ -724,42 +729,42 @@ $j(document).ready(function(){
                                     </tr>
                                     <tr id="row_radio">
                                         <td width="30%">
-                                            <a href="device-map/router2g.asp" target="statusframe" style="outline:0;"><div id="iconRouter" class="big-icons big-icons-router" onclick="clickEvent(this);"></div></a>
+                                            <a href="device-map/router2g.asp" target="statusframe" style="outline:0;"><div id="iconRouter" class="big-icons big-icons-router" onclick="clickEvent(this);"></div><span class="ui-map-label">无线网络</span></a>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="wl_securitylevel_span" style="padding-right: 3px;"></div></div>
                                             <div class="arrow-right" id="arrow-router"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>
-                                            <a id="clientStatusLink" href="device-map/clients.asp" target="statusframe" style="outline:0;"><div id="iconClient" class="big-icons big-icons-laptop" onclick="clickEvent(this);"></div></a>
+                                            <a id="clientStatusLink" href="device-map/clients.asp" target="statusframe" style="outline:0;"><div id="iconClient" class="big-icons big-icons-laptop" onclick="clickEvent(this);"></div><span class="ui-map-label">已连接设备</span></a>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><b><div id="clientNumber">&nbsp;</div></b></div>
                                             <div class="arrow-right" id="arrow-clients"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
                                     </tr>
                                     <tr id="row_usb_port1">
                                         <td width="30%">
-                                            <div id="deviceIcon_0" class="big-icons big-icons-usb"></div>
+                                            <div id="deviceIcon_0" class="big-icons big-icons-usb"></div><span class="ui-map-label">USB 1</span>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="deviceDec_0"></div></div>
                                             <div class="arrow-right" id="arrow-usb1"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
                                     </tr>
                                     <tr id="row_usb_port2" style="display:none">
                                         <td width="30%">
-                                            <div id="deviceIcon_1" class="big-icons big-icons-usb"></div>
+                                            <div id="deviceIcon_1" class="big-icons big-icons-usb"></div><span class="ui-map-label">USB 2</span>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="deviceDec_1"></div></div>
                                             <div class="arrow-right" id="arrow-usb2"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
                                     </tr>
                                     <tr id="row_ata_pool" style="display:none">
                                         <td width="30%">
-                                            <div id="sataIcon" class="big-icons big-icons-ata"></div>
+                                            <div id="sataIcon" class="big-icons big-icons-ata"></div><span class="ui-map-label">SATA 存储</span>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="sataDec"></div></div>
                                             <div class="arrow-right" id="arrow-ata"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
                                     </tr>
                                     <tr id="row_mmc_slot" style="display:none">
                                         <td width="30%">
-                                            <div id="cardIcon" class="big-icons big-icons-mmc"></div>
+                                            <div id="cardIcon" class="big-icons big-icons-mmc"></div><span class="ui-map-label">存储卡</span>
                                             <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="cardDec"></div></div>
                                             <div class="arrow-right" id="arrow-mmc"><img src="/bootstrap/img/arrow-right.png"></div>
                                         </td>
@@ -776,7 +781,7 @@ $j(document).ready(function(){
                         </div>
                     </div>
 
-                    <div class="span10">
+                    <div class="span12 ui-network-detail">
                         <div class="box well grad_colour_dark_blue">
                             <div id="statusIcon" style="display: none"></div>
                             <h2 id="helpname" class="box_head round_top"></h2>

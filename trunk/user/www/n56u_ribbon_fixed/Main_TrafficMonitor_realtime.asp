@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#> - <#menu4_2#> : <#menu4_2_1#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,15 +11,17 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-<script type="text/javascript" src="/bootstrap/js/highcharts.js"></script>
-<script type="text/javascript" src="/bootstrap/js/highcharts_theme.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
+<script type="text/javascript" src="/ui/chart.js"></script>
+
 <script type="text/javascript" src="/net_speed_tabs.js"></script>
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
@@ -121,7 +126,7 @@ var net_chart_rt = {
     }]
 };
 
-Highcharts.setOptions(Highcharts.locale);
+RouterChart.setOptions(RouterChart.locale);
 
 $j(document).ready(function(){
 	$j("#tabs a").click(function(){
@@ -132,7 +137,7 @@ $j(document).ready(function(){
 		$j("#tab_tr_dy").parents('li').hide();
 		$j("#tab_tr_mo").parents('li').hide();
 	}
-	netChart = new Highcharts.StockChart(net_chart_rt);
+	if (!netChart) netChart = new RouterChart.Chart(net_chart_rt);
 	invoke_timer(2);
 });
 
@@ -147,6 +152,7 @@ performance.now = (function() {
 })();
 
 function initial(){
+    if (!netChart) netChart = new RouterChart.Chart(net_chart_rt);
 	show_banner(0);
 	show_menu(5, -1, 0);
 	show_footer();
@@ -273,14 +279,7 @@ function calc_speed(now_perf){
 function eval_netdevs(response){
 	var now_perf = performance.now();
 
-	netdevs = {};
-
-	try {
-		eval(response);
-	}
-	catch (ex) {
-		netdevs = {};
-	}
+	// 数据脚本由传输层加载，保留本轮返回值。
 
 	calc_speed(now_perf);
 	netChart.redraw();

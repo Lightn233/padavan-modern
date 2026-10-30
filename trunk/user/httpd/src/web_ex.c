@@ -1211,6 +1211,9 @@ static int wifi5_validate_form(webs_t wp)
 }
 #endif
 
+#include "ui_status_http.h"
+#include "wan_diagnostic.h"
+
 static int
 update_variables_ex(int eid, webs_t wp, int argc, char **argv)
 {
@@ -1861,6 +1864,8 @@ wanlink_hook(int eid, webs_t wp, int argc, char **argv)
 	if (strlen(wan_dns) < 7)
 		strcpy(wan_dns, "---");
 
+	websWrite(wp, "function wanlink_issue() { return %d;}\n",
+		(status_code != INET_STATE_CONNECTED && ppp_mode && !get_ap_mode()) ? ui_ppp_recent_issue() : UI_WAN_NONE);
 	websWrite(wp, "function wanlink_status() { return %d;}\n", status_code);
 	websWrite(wp, "function wanlink_etherlink() { return '%s';}\n", etherlink);
 	websWrite(wp, "function wanlink_apclilink() { return '%s';}\n", apclilink);
@@ -3628,7 +3633,8 @@ apply_cgi(const char *url, webs_t wp)
 	}
 	else if (!strcmp(value, " RestoreStorage "))
 	{
-		doSystem("/sbin/mtd_storage.sh %s", "reset");
+		int result = doSystem("/sbin/mtd_storage.sh %s", "reset");
+		websWrite(wp, "<script>parent.uiStorageResetDone(%d);</script>", result);
 		return 0;
 	}
 	else if (!strcmp(value, " CommitFlash "))
@@ -4218,6 +4224,8 @@ static char mentohust_log_txt[] =
 #endif
 
 struct mime_handler mime_handlers[] = {
+    { "system_status.json*|internet_status.json*", "application/json", no_cache_IE, NULL, do_ej, 1 },
+    { "operation_status.json*", "application/json", no_cache_IE, NULL, do_ui_status, 1 },
 #if defined(APP_DDNS_GO)
     { "ddns_go.asp", "application/json", no_cache_IE, do_ddns_go_post, do_ddns_go, 1 },
 #endif
@@ -4546,6 +4554,8 @@ struct ej_handler ej_handlers[] =
 	{ "get_parameter", ej_get_parameter},
 	{ "get_nvram_list", ej_get_nvram_list},
 	{ "get_flash_time", ej_get_flash_time},
+	{ "ui_operation_baseline", ej_ui_operation_baseline},
+	{ "ui_operation_prepare", ej_ui_operation_prepare},
 	{ "get_static_client", ej_get_static_client},
 	{ "get_static_ccount", ej_get_static_ccount},
 #ifndef WEBUI_HIDE_VPN

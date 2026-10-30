@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -12,6 +15,8 @@
 <script>
 var page_modified = 0;
 var restart_time = 0;
+var operation = null;
+function apply_operation(value){ operation = value; }
 
 var current_page = '<% get_parameter("current_page"); %>';
 var next_page = '<% get_parameter("next_page"); %>';
@@ -74,10 +79,23 @@ function initial(){
 	else if(page_modified == 1){
 		// 模式切换使用专用提示；AP 的新管理地址不能由旧 LAN 地址推断。
 		if(current_page == "Advanced_OperationMode_Content.asp" && typeof parent.modeSwitchCommitted == "function"){
-			parent.modeSwitchCommitted(restart_time);
+			parent.modeSwitchCommitted(restart_time, operation);
 			return;
 		}
-		parent.showLoading(restart_time, "waiting");
+        if (typeof parent.uiApplyCommitted === "function" && operation) {
+            var destination = current_page.replace(/^\//, "");
+            var safePage = /^[A-Za-z0-9_\/.-]+\.asp$/.test(destination) && destination.indexOf("..") < 0;
+            var changedAddress = destination === "Advanced_LAN_Content.asp" || destination === "Advanced_APLAN_Content.asp";
+            var link = changedAddress ? parent.uiSafeManagementLink(parent.document.form.lan_ipaddr.value) : "";
+            parent.uiApplyCommitted(operation, function(){
+                if (changedAddress && link) parent.location.href = link;
+                else if (safePage) parent.location.href = "/" + destination;
+                else parent.location.href = "/";
+            });
+            if (link) parent.uiWaitController.options.link = link;
+            return;
+        }
+        parent.showLoading(restart_time, "waiting");
 		if(current_page.length > 0){
 			if(current_page.indexOf("clients.asp") >= 0){
 				document.redirectForm.flag.value = "Client";
@@ -121,6 +139,7 @@ function hideLoading(){
 </form>
 
 <% update_variables(); %>
+<% ui_operation_prepare(); %>
 <% asus_nvram_commit(); %>
 <% notify_services(); %>
 

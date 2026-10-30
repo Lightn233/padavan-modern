@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#> - <#menu5_6_6#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,11 +11,13 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
+<script src="/ui/core.js?v=1"></script>
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
@@ -27,14 +32,14 @@ function initial(){
     if ("<% nvram_get_x("","ttyd_enable"); %>" === "1") {
         $j('#console-alert').hide();
         $j('#console-table').hide();
-        $j('#console-form').unbind('keypress');
+        $j('#console-form').off('keypress');
 
         var termUrl = window.location.protocol + "//" + window.location.hostname + ":" + "<% nvram_get_x("","ttyd_port"); %>";
 	    $j("#term-iframe").attr("src", termUrl).show();
     } else {
         if (!login_safe()){
-            $j('#btn_exec').attr('disabled', 'disabled');
-            $j('#SystemCmd').attr('disabled', 'disabled');
+            $j('#btn_exec').prop("disabled", true);
+            $j('#SystemCmd').prop("disabled", true);
         } else
             document.form.SystemCmd.focus();
     }
@@ -44,14 +49,14 @@ function getResponse(){
 	$j.get('/console_response.asp', function(data){
 		var response = ($j.browser.msie && !is_ie11p) ? data.nl2br() : data;
 		$j("#console_area").text(response);
-		$j('#btn_exec').removeAttr('disabled');
+		$j('#btn_exec').prop("disabled", false);
 	});
 }
 
 function startPost(){
 	if (!login_safe())
 		return false;
-	$j('#btn_exec').attr('disabled', 'disabled');
+	$j('#btn_exec').prop("disabled", true);
 	$j.post('/apply.cgi',
 	{
 		'action_mode': ' SystemCmd ',

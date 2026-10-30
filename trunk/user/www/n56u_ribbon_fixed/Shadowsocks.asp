@@ -2,6 +2,9 @@
 <html>
 
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 	<title>
 		<#Web_Title#> - <#menu5_16#>
 	</title>
@@ -10,16 +13,18 @@
 	<meta http-equiv="Expires" content="-1">
 	<link rel="shortcut icon" href="images/favicon.ico">
 	<link rel="icon" href="images/favicon.png">
-	<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-	<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap-table.min.css">
-	<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
-	<link rel="stylesheet" type="text/css" href="/bootstrap/css/engage.itoggle.css">
+	
+	
+	
+	
 	<script type="text/javascript" src="/jquery.js?random=<% uptime(); %>"></script>
-	<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-	<script type="text/javascript" src="/bootstrap/js/bootstrap-table.min.js"></script>
-	<script type="text/javascript" src="/bootstrap/js/bootstrap-table-zh-CN.min.js"></script>
-	<script type="text/javascript" src="/bootstrap/js/engage.itoggle.min.js"></script>
+<script src="/ui/core.js?v=1"></script>
+	
+	<script src="/ui/table.js?v=1"></script>
+	
+	
 	<script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 	<script type="text/javascript" src="/general.js"></script>
 	<script type="text/javascript" src="/itoggle.js"></script>
 	<script type="text/javascript" src="/popup.js"></script>
@@ -477,6 +482,7 @@ setTimeout('document.getElementById("btn_ctime").style.display="none";',1000);
 						ajax:function(request) {
 						$j.ajax({
 						  url:"/dbconf?p=ss&v=<% uptime(); %>",
+                          dataType:"script",
 						  type:"get",
 						  success:function(data){
 							request.success({
@@ -499,32 +505,32 @@ setTimeout('document.getElementById("btn_ctime").style.display="none";',1000);
 						nodeList.options.add(new Option(text, key.replace(keyStr, ''))); // 通过 replacce把不要的字符去掉
 						unodeList.options.add(new Option(text, key.replace(keyStr, ''))); // 通过 replacce把不要的字符去掉
 						s5nodeList.options.add(new Option(text, key.replace(keyStr, ''))); // 通过 replacce把不要的字符去掉
-						$j('#nodeList>option').sort(function (a, b) {
+						$j($j('#nodeList>option').get().sort(function (a, b) {
 							var aText = $j(a).val() * 1;
 							var bText = $j(b).val() * 1;
 							if (aText > bText) return -1;
 							if (aText < bText) return 1;
 							return 0;
-						}).appendTo('#nodeList');
-						$j('#nodeList>option').eq(0).attr("selected", "selected");
+						})).appendTo('#nodeList');
+						$j('#nodeList>option').eq(0).prop("selected", true);
 						//udp列表
-						$j('#u_nodeList>option').sort(function (a, b) {
+						$j($j('#u_nodeList>option').get().sort(function (a, b) {
 							var aText = $j(a).val() * 1;
 							var bText = $j(b).val() * 1;
 							if (aText > bText) return -1;
 							if (aText < bText) return 1;
 							return 0;
-						}).appendTo('#u_nodeList');
-						$j('#u_nodeList>option').eq(0).attr("selected", "selected");
+						})).appendTo('#u_nodeList');
+						$j('#u_nodeList>option').eq(0).prop("selected", true);
 						//s5列表
-						$j('#s5_nodeList>option').sort(function (a, b) {
+						$j($j('#s5_nodeList>option').get().sort(function (a, b) {
 							var aText = $j(a).val() * 1;
 							var bText = $j(b).val() * 1;
 							if (aText > bText) return -1;
 							if (aText < bText) return 1;
 							return 0;
-						}).appendTo('#s5_nodeList');
-						$j('#s5_nodeList>option').eq(0).attr("selected", "selected");
+						})).appendTo('#s5_nodeList');
+						$j('#s5_nodeList>option').eq(0).prop("selected", true);
 						//$j('#nodeList').selectpicker('val', '<% nvram_get_x("","global_server"); %>'); //主服务器列表默认
 						//$j('#u_nodeList').selectpicker('val', '<% nvram_get_x("","udp_relay_server"); %>'); //UDP服务器列表默认
 						document.form.global_server.value = '<% nvram_get_x("","global_server"); %>';

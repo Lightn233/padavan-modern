@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -14,21 +17,12 @@ var action_mode = '<% get_parameter("action_mode"); %>';
 var boot_time = parent.board_boot_time();
 
 function redirect(){
-	setTimeout("redirect1();", (boot_time+2)*1000);
-}
-
-function redirect1(){
-	if(action_mode == " RestoreNVRAM ")
-		parent.location.href = "http://192.168.2.1/";
-	else
-		parent.location.href = "/";
+    var target = action_mode === " RestoreNVRAM " ? "http://192.168.2.1/" : "/";
+    parent.uiRebootWait({link:target, done:function(){parent.location.href=target;}});
 }
 </script>
 </head>
 <body onLoad="redirect();">
-<script>
-	parent.hideLoading();
-	parent.showLoading(boot_time, "waiting");
-</script>
+
 </body>
 </html>

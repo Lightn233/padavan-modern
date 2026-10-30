@@ -741,7 +741,7 @@ function show_footer(){
 	footer_code = '<div align="center" class="bottom-image"></div>\n';
 	footer_code +='<div align="center" class="copyright"><#footer_copyright_desc#></div>\n';
 	footer_code +='<div align="center">\n';
-	footer_code +='  <span>Highcharts by Torstein Hønsi & <a href="http://www.highcharts.com">Highsoft</a></span></br>\n';
+	footer_code +='  <span>RouterChart by Torstein Hønsi & <a href="http://www.highcharts.com">Highsoft</a></span></br>\n';
 	footer_code +='  <span>Big icons designed by <a href="http://www.freepik.com">Freepik</a></br></span>\n';
 	footer_code +='  <span>Non-Commercial Use Only</span></br>\n';
 	footer_code +='</div>\n';
@@ -818,7 +818,7 @@ function show_loading_obj(){
 	code += '</div></center>';
 
 	$("Loading").innerHTML = code;
-	id_check_status = setTimeout('hideLoading();', 3000);
+	// 初始遮罩由样式隐藏，不能用旧计时器关闭后来启动的等待流程。
 }
 
 function submit_language(){
@@ -850,7 +850,7 @@ function logout(){
 function reboot(){
 	if(!confirm('<#Main_content_Login_Item7#>'))
 		return;
-	showLoading(board_boot_time());
+	uiRebootWait({done:function(){location.href="/";}});
 	var $j = jQuery.noConflict();
 	$j.post('/apply.cgi',
 	{
@@ -1288,30 +1288,7 @@ jQuery(document).ready(function(){
         });
     });
 
-    var idFindSyslogPanel = setInterval(function(){
-        if(is_mobile || log_float == '0'){
-            clearInterval(idFindSyslogPanel);
-        }else if($j('.syslog_panel').size() > 0){
-            clearInterval(idFindSyslogPanel);
 
-            var offsetLeft = $j('.wrapper').offset().left;
-            $j('.syslog_panel').css({opacity: 1});
-            $j('.syslog_panel').tabSlideOut({
-                tabHandle: '.handle',
-                imageHeight: '20px',
-                imageWidth: '62px',
-                tabLocation: 'top',
-                speed: 300,
-                action: 'click',
-                topPos: '400px',
-                leftPos: (offsetLeft+5)+'px',
-                fixedPosition: true
-            });
-
-            setLogData();
-            showClockLogArea();
-        }
-    }, 100);
 });
 
 // fix for ie
@@ -1369,7 +1346,7 @@ function setLogData(){
 }
 
 function showClockLogArea(){
-    if(jQuery('#system_time').size() == 0){
+    if(jQuery('#system_time').length == 0){
         JS_timeObj.setTime(systime_millsec);
         systime_millsec += 1000;
 
@@ -1458,183 +1435,22 @@ function removeFromLocalStorage(name){
     }
 }
 
-(function($){
-    var $j = $.noConflict();
-    $j.fn.tabSlideOut = function(callerSettings){
-        var settings =  $j.extend({
-            tabHandle: '.handle',
-            speed: 300,
-            action: 'click',
-            tabLocation: 'left',
-            topPos: '200px',
-            leftPos: '20px',
-            fixedPosition: false,
-            positioning: 'absolute',
-            pathToTabImage: null,
-            imageHeight: null,
-            imageWidth: null
-        }, callerSettings||{});
 
-        settings.tabHandle =  $j(settings.tabHandle);
-        var obj = this;
-        if (settings.fixedPosition === true) {
-            settings.positioning = 'fixed';
-        } else {
-            settings.positioning = 'absolute';
-        }
 
-        //ie6 doesn't do well with the fixed option
-        if (document.all && !window.opera && !window.XMLHttpRequest) {
-            settings.positioning = 'absolute';
-        }
-
-        //set initial tabHandle css
-        settings.tabHandle.css({
-            'display': 'block',
-            'width' : settings.imageWidth,
-            'height': settings.imageHeight,
-            //'textIndent' : '-99999px',
-            //'background' : 'url('+settings.pathToTabImage+') no-repeat',
-            'outline' : 'none',
-            'position' : 'absolute',
-            'border-radius': '0px 0px 4px 4px',
-            'background-color': '#f5f5f5',
-            'border-left': '1px solid #ddd',
-            'border-right': '1px solid #ddd',
-            'border-bottom': '1px solid #ddd'
-        });
-
-        obj.css({
-            'line-height' : '1',
-            'position' : settings.positioning
-        });
-
-        var properties = {
-            containerWidth: parseInt(obj.outerWidth(), 10) + 'px',
-            containerHeight: parseInt(obj.outerHeight(), 10) + 'px',
-            tabWidth: parseInt(settings.tabHandle.outerWidth(), 10) + 'px',
-            tabHeight: parseInt(settings.tabHandle.outerHeight(), 10) + 'px'
-        };
-
-        //set calculated css
-        if(settings.tabLocation === 'top' || settings.tabLocation === 'bottom') {
-            obj.css({'left' : settings.leftPos});
-            settings.tabHandle.css({'right' : -1});
-        }
-
-        if(settings.tabLocation === 'top') {
-            obj.css({'top' : '-' + properties.containerHeight});
-            settings.tabHandle.css({'bottom' : '-' + properties.tabHeight});
-        }
-
-        if(settings.tabLocation === 'bottom') {
-            obj.css({'bottom' : '-' + properties.containerHeight, 'position' : 'fixed'});
-            settings.tabHandle.css({'top' : '-' + properties.tabHeight});
-
-        }
-
-        if(settings.tabLocation === 'left' || settings.tabLocation === 'right') {
-            obj.css({
-                'height' : properties.containerHeight,
-                'top' : settings.topPos
-            });
-
-            settings.tabHandle.css({'top' : 0});
-        }
-
-        if(settings.tabLocation === 'left') {
-            obj.css({ 'left': '-' + properties.containerWidth});
-            settings.tabHandle.css({'right' : '-' + properties.tabWidth});
-        }
-
-        if(settings.tabLocation === 'right') {
-            obj.css({ 'right': '-' + properties.containerWidth});
-            settings.tabHandle.css({'left' : '-' + properties.tabWidth});
-
-            $j('html').css('overflow-x', 'hidden');
-        }
-
-        //functions for animation events
-
-        settings.tabHandle.click(function(event){
-            event.preventDefault();
-        });
-
-        var slideIn = function() {
-
-            if (settings.tabLocation === 'top') {
-                obj.animate({top:'-' + properties.containerHeight}, settings.speed).removeClass('open');
-            } else if (settings.tabLocation === 'left') {
-                obj.animate({left: '-' + properties.containerWidth}, settings.speed).removeClass('open');
-            } else if (settings.tabLocation === 'right') {
-                obj.animate({right: '-' + properties.containerWidth}, settings.speed).removeClass('open');
-            } else if (settings.tabLocation === 'bottom') {
-                obj.animate({bottom: '-' + properties.containerHeight}, settings.speed).removeClass('open');
-            }
-
-        };
-
-        var slideOut = function() {
-
-            if (settings.tabLocation == 'top') {
-                obj.animate({top:'-3px'},  settings.speed, onCompleteSlideOutLogArea()).addClass('open');
-            } else if (settings.tabLocation == 'left') {
-                obj.animate({left:'-3px'},  settings.speed, onCompleteSlideOutLogArea()).addClass('open');
-            } else if (settings.tabLocation == 'right') {
-                obj.animate({right:'-3px'},  settings.speed, onCompleteSlideOutLogArea()).addClass('open');
-            } else if (settings.tabLocation == 'bottom') {
-                obj.animate({bottom:'-3px'},  settings.speed, onCompleteSlideOutLogArea()).addClass('open');
-            }
-        };
-
-        var clickScreenToClose = function() {
-            obj.click(function(event){
-                event.stopPropagation();
-            });
-
-            $j(document).click(function(){
-                slideIn();
-            });
-        };
-
-        var clickAction = function(){
-            settings.tabHandle.click(function(event){
-                if (obj.hasClass('open')) {
-                    slideIn();
-                } else {
-                    slideOut();
-                }
-            });
-
-            clickScreenToClose();
-        };
-
-        var hoverAction = function(){
-            obj.hover(
-                function(){
-                    slideOut();
-                },
-
-                function(){
-                    slideIn();
-                });
-
-            settings.tabHandle.click(function(event){
-                if (obj.hasClass('open')) {
-                    slideIn();
-                }
-            });
-            clickScreenToClose();
-
-        };
-
-        //choose which type of action to bind
-        if (settings.action === 'click') {
-            clickAction();
-        }
-
-        if (settings.action === 'hover') {
-            hoverAction();
-        }
+// 只展示固定映射，不显示运营商返回的账号等原始认证内容。
+function wanIssueText(code){
+    var messages = {
+        1:"运营商拒绝拨号：宽带账号已有在线会话，超过允许的连接数。请断开其他使用该账号的设备；若没有其他设备，请联系运营商清理残留会话。",
+        2:"运营商拒绝认证。请核对宽带账号、密码和账号状态；这不一定表示密码错误。",
+        3:"等待 PPPoE 服务器响应超时（PADO）。请检查 WAN 接线、光猫桥接和运营商线路。",
+        4:"PPPoE 服务器未确认会话（PADS 超时）。目前尚未进入账号认证，可能与已有会话、接入限制或线路异常有关。",
+        5:"运营商终止了 PPP 连接，设备正在按现有设置重新连接。",
+        6:"PPP 链路或地址协商超时，请检查运营商线路和拨号日志。"
     };
-})(jQuery);
+    return messages[code] || "";
+}
+function renderWanIssue(element, status, issue){
+    var text = status === 0 ? "" : wanIssueText(issue);
+    element.textContent = text ? "本次拨号进程最近一次失败：" + text : "";
+    element.style.display = text ? "block" : "none";
+}

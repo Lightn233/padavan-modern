@@ -26,6 +26,7 @@
 
 
 #include "rt_config.h"
+#include <wifi_runtime_status.h>
 
 #ifdef VENDOR_FEATURE7_SUPPORT
 #ifdef WSC_LED_SUPPORT
@@ -5730,6 +5731,41 @@ INT RTMPAPQueryInformation(
 	}
 
 	switch (cmd) {
+
+    /* 网页只读查询；检测状态由驱动提供，不能通过此接口缩短或停止 DFS。 */
+    case PADAVAN_OID_WIFI_RUNTIME:
+    {
+        struct padavan_wifi_runtime snapshot = {0};
+        UCHAR bw;
+        if (!wdev || wdev->wdev_type != WDEV_TYPE_AP)
+            return -EOPNOTSUPP;
+        if (!wrq->u.data.pointer || wrq->u.data.length < sizeof(snapshot))
+            return -EINVAL;
+        snapshot.magic = PADAVAN_WIFI_RUNTIME_MAGIC;
+        snapshot.channel = READ_ONCE(wdev->channel);
+        bw = wlan_operate_get_bw(wdev);
+        snapshot.width = bw <= BW_160 ? (20U << bw) : 0;
+        snapshot.state = PADAVAN_WIFI_STARTING;
+        if (READ_ONCE(wdev->if_up_down_state) && READ_ONCE(wdev->bAllowBeaconing) &&
+            READ_ONCE(wdev->bcn_buf.bBcnSntReq))
+            snapshot.state = PADAVAN_WIFI_READY;
+#ifdef MT_DFS_SUPPORT
+        if (wdev->pDot11_H) {
+            struct DOT11_H *dot11h = wdev->pDot11_H;
+            UCHAR mode = READ_ONCE(dot11h->RDMode);
+            if (mode == RD_SILENCE_MODE) {
+                snapshot.state = PADAVAN_WIFI_CAC;
+                snapshot.cac_total = READ_ONCE(dot11h->ChMovingTime);
+                snapshot.cac_elapsed = READ_ONCE(dot11h->RDCount);
+                padavan_wifi_runtime_clamp(&snapshot);
+            } else if (mode == RD_SWITCHING_MODE)
+                snapshot.state = PADAVAN_WIFI_SWITCHING;
+        }
+#endif
+        wrq->u.data.length = sizeof(snapshot);
+        return copy_to_user(wrq->u.data.pointer, &snapshot, sizeof(snapshot)) ? -EFAULT : 0;
+    }
+
 #ifdef ACS_CTCC_SUPPORT
 	case OID_802_11_GET_ACS_CHANNEL_SCORE:
 		{

@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#> - <#menu5_6_4#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,12 +11,14 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
@@ -95,6 +100,13 @@ function restoreNVRAM(){
 		document.form.submit();
 	}else
 		return false;
+}
+
+function uiStorageResetDone(result){
+    if (result === 0) {
+        if (uiWaitController) uiWaitController.end("complete", "已完成存储设置重置", "后台已返回操作结果。", true);
+        setTimeout(function(){location.reload();}, 1000);
+    } else if (uiWaitController) uiWaitController.end("failed", "存储设置重置失败", "请检查系统日志；本页不会自动重试。", false);
 }
 
 function restoreStorage(){

@@ -25,7 +25,7 @@ var tabs_desc = [
 	[ 20, "ESW_P7",    "Ethernet port: LAN7" ]
 ];
 
-Highcharts.locale = {
+RouterChart.locale = {
 	global : {
 		useUTC : false
 	},

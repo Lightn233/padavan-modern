@@ -1,0 +1,31 @@
+/* 节点列表使用原生表格，支持排序、多选、分页和原有行操作。 */
+(function(root){
+ 'use strict';var $=root.jQuery;
+ function create(tag,text){var e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;}
+ // 保留原节点表的延迟颜色和长文本省略，不接受外部资源或任意样式。
+ function decorateCell(cell,column,value,row,index){
+  if(/^(left|center|right)$/.test(column.align||''))cell.style.textAlign=column.align;
+  if(/^(top|middle|bottom)$/.test(column.valign||''))cell.style.verticalAlign=column.valign;
+  if(/^\d+(?:px|%)$/.test(column.width||''))cell.style.width=column.width;
+  var result=typeof column.cellStyle==='function'?column.cellStyle(value,row,index):null;
+  var css=result&&result.css||{};
+  Object.keys(css).forEach(function(name){
+   var v=String(css[name]);
+   if((name==='color'||name==='background'||name==='background-color')&&/^(#[\da-f]{3,8}|[a-z]+|rgba?\([\d\s.,%]+\))$/i.test(v))cell.style.setProperty(name,v);
+   else if(name==='white-space'&&/^(normal|nowrap)$/.test(v))cell.style.setProperty(name,v);
+   else if(name==='text-overflow'&&/^(clip|ellipsis)$/.test(v))cell.style.setProperty(name,v);
+   else if(name==='overflow'&&/^(hidden|auto|visible)$/.test(v))cell.style.setProperty(name,v);
+   else if((name==='max-width'||name==='min-width')&&/^\d+px$/.test(v))cell.style.setProperty(name,v);
+  });
+ }
+ function Table(host,options){this.host=host;this.options=options;this.rows=[];this.selected=new Set();this.page=1;this.size=options.pageSize||15;this.sort=options.sortName;this.desc=options.sortOrder==='desc';this.footer=create('div');this.footer.className='ui-table-footer';host.after(this.footer);host.classList.add('table');this.refresh();}
+ Table.prototype.refresh=function(){var self=this;this.host.setAttribute('aria-busy','true');if(this.options.ajax)this.options.ajax({success:function(result){self.host.removeAttribute('aria-busy');if(Array.isArray(result))self.load(result);else if(result&&Array.isArray(result.rows))self.load(result.rows);},error:function(){self.host.removeAttribute('aria-busy');self.footer.textContent='加载失败，请重试。';}});else this.load(this.options.data||[]);};
+ Table.prototype.load=function(rows){this.rows=Array.isArray(rows)?rows:[];var ids=new Set(this.rows.map(this.key.bind(this)));this.selected.forEach(function(id){if(!ids.has(id))this.selected.delete(id);},this);this.render();};
+ Table.prototype.key=function(row){return String(row[this.options.uniqueId||'id']);};
+ Table.prototype.render=function(){var self=this,rows=this.rows.slice();if(this.sort)rows.sort(function(a,b){var x=a[self.sort],y=b[self.sort],cmp=Number.isFinite(+x)&&Number.isFinite(+y)?+x-+y:String(x||'').localeCompare(String(y||''));return self.desc?-cmp:cmp;});var pages=Math.max(1,Math.ceil(rows.length/this.size));this.page=Math.min(pages,this.page);rows=rows.slice((this.page-1)*this.size,this.page*this.size);this.host.replaceChildren();var head=create('thead'),tr=create('tr'),body=create('tbody');
+  this.options.columns.forEach(function(col){var th=create('th');th.scope='col';if(col.checkbox){var all=create('input');all.type='checkbox';all.setAttribute('aria-label','选择当前页');all.checked=rows.length>0&&rows.every(function(row){return self.selected.has(self.key(row));});all.indeterminate=!all.checked&&rows.some(function(row){return self.selected.has(self.key(row));});all.onchange=function(){rows.forEach(function(row){if(all.checked)self.selected.add(self.key(row));else self.selected.delete(self.key(row));});self.render();};th.appendChild(all);}else if(col.sortable){var b=create('button',col.title+(self.sort===col.field?(self.desc?' ↓':' ↑'):''));b.type='button';b.className='ui-sort';b.onclick=function(){self.desc=self.sort===col.field?!self.desc:false;self.sort=col.field;self.render();};th.setAttribute('aria-sort',self.sort===col.field?(self.desc?'descending':'ascending'):'none');th.appendChild(b);}else th.textContent=col.title||'';tr.appendChild(th);});head.appendChild(tr);
+  rows.forEach(function(row,index){var r=create('tr'),id=self.key(row);self.options.columns.forEach(function(col){var td=create('td');if(col.checkbox){var check=create('input');check.type='checkbox';check.checked=self.selected.has(id);check.setAttribute('aria-label','选择节点 '+id);check.onchange=function(){if(check.checked)self.selected.add(id);else self.selected.delete(id);self.render();};td.appendChild(check);}else if(col.events){Object.keys(col.events).forEach(function(event){var cls=event.split(' ')[1];var label=cls.indexOf('edit')>=0?'编辑':cls.indexOf('copy')>=0?'复制':'删除';var b=create('button',label);b.type='button';b.className='btn btn-small';b.onclick=function(e){col.events[event](e,row[col.field],row,index);};td.appendChild(b);});}else{var value=row[col.field];td.textContent=col.field==='ping'&&value!==undefined?(value==='failed'?'失败':value+' ms'):value==null?'—':String(value);td.title=td.textContent;}decorateCell(td,col,row[col.field],row,index);r.appendChild(td);});body.appendChild(r);});
+  if(!rows.length){var empty=create('tr'),cell=create('td','暂无节点');cell.colSpan=this.options.columns.length;empty.appendChild(cell);body.appendChild(empty);}this.host.append(head,body);this.footer.replaceChildren();var prev=create('button','上一页'),next=create('button','下一页');prev.type=next.type='button';prev.className=next.className='btn btn-small';prev.disabled=this.page<=1;next.disabled=this.page>=pages;prev.onclick=function(){self.page--;self.render();};next.onclick=function(){self.page++;self.render();};var select=create('select');select.setAttribute('aria-label','每页条数');(this.options.pageList||[15,25,50]).forEach(function(n){var o=create('option',n+' 条 / 页');o.value=n;o.selected=n===self.size;select.appendChild(o);});select.onchange=function(){self.size=+select.value;self.page=1;self.render();};this.footer.append(create('span','共 '+this.rows.length+' 条 · '+this.page+' / '+pages+' 页'),prev,next,select);
+ };
+ $.fn.bootstrapTable=function(action,value){if(action==='getSelections'){var t=this[0]&&this[0]._uiTable;return t?t.rows.filter(function(row){return t.selected.has(t.key(row));}):[];}return this.each(function(){if(typeof action==='object'){if(!this._uiTable)this._uiTable=new Table(this,action);}else if(this._uiTable&&typeof this._uiTable[action]==='function')this._uiTable[action](value);});};
+})(window);

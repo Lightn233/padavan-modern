@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,13 +11,16 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
+<script src="/ui/core.js?v=1"></script>
 <script type="text/javascript" src="formcontrol.js"></script>
 <script type="text/javascript" src="/state.js"></script>
-<script type="text/javascript" src="/jquery.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
+
+
 <script>
 
 <% wanlink(); %>
@@ -235,6 +241,7 @@ function fill_wan_bytes(rx,tx,now){
 function fill_info(){
 	var now = performance.now();
 	fill_status(wanlink_status(), wanlink_type());
+	renderWanIssue(document.getElementById("wan_issue"), wanlink_status(), typeof wanlink_issue === "function" ? wanlink_issue() : 0);
 	fill_uptime(wanlink_uptime(), wanlink_dltime());
 	fill_phylink(wanlink_etherlink(), wanlink_apclilink());
 	fill_man_addr4(wanlink_ip4_man(), wanlink_gw4_man());
@@ -303,7 +310,7 @@ function submitInternet(v){
   </tr>
   <tr>
     <th><#ConnectionStatus#></th>
-    <td id="wan_status" colspan="3"></td>
+    <td colspan="3"><div id="wan_status"></div><div id="wan_issue" role="status" aria-live="polite" class="alert alert-warning" style="display:none;margin-top:10px;white-space:normal"></div></td>
   </tr>
   <tr>
     <th><#Connectiontype#>:</th>

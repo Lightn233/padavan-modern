@@ -63,6 +63,9 @@ helpcontent[7] = new Array("",
 				"<#vpn_passthrough_desc#>",
 				"<#vpn_passthrough_desc#>",
 				"<#vpn_passthrough_desc#>");
+// 静态使用说明放在对应标签的悬停帮助中，页面保留给设置和实际故障。
+helpcontent[7][23] += "<br><br>硬件 NAT 会绕过软件限速。使用自定义 QoS 前请关闭硬件 NAT；内置 SQM 启用期间会暂停硬件 NAT 和 shortcut-fe，保留这里的设置。";
+helpcontent[7][28] = "shortcut-fe 是软件转发加速。它可能绕过软件限速；使用自定义 QoS 前请关闭，内置 SQM 启用期间会暂时停用它，保留设置。硬件 NAT 与 shortcut-fe 同时开启时，不代表性能可以简单叠加。";
 //Firewall
 helpcontent[8] = new Array("",
 				"<#FirewallConfig_WanLanLog_itemdesc#>",

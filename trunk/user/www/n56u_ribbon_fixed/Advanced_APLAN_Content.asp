@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/base.css?v=1">
+<link rel="stylesheet" href="/ui/icons.css?v=1">
 <title><#Web_Title#> - <#menu5_2_1#></title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Pragma" content="no-cache">
@@ -8,14 +11,16 @@
 
 <link rel="shortcut icon" href="images/favicon.ico">
 <link rel="icon" href="images/favicon.png">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/bootstrap.min.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/main.css">
-<link rel="stylesheet" type="text/css" href="/bootstrap/css/engage.itoggle.css">
+
+
+
 
 <script type="text/javascript" src="/jquery.js"></script>
-<script type="text/javascript" src="/bootstrap/js/bootstrap.min.js"></script>
-<script type="text/javascript" src="/bootstrap/js/engage.itoggle.min.js"></script>
+<script src="/ui/core.js?v=1"></script>
+
+
 <script type="text/javascript" src="/state.js"></script>
+<script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
@@ -46,11 +51,11 @@ function on_change_lan_dhcpc(){
 	var en_ip = 1;
 	if(document.form.lan_proto_x[0].checked){
 		en_ip = 0;
-		$j('input[name="lan_dns_x"]').removeAttr('disabled');
+		$j('input[name="lan_dns_x"]').prop("disabled", false);
 		$("row_lan_dns_x").style.display = "";
 	}else{
 		$("row_lan_dns_x").style.display = "none";
-		$j('input[name="lan_dns_x"]').attr('disabled','disabled');
+		$j('input[name="lan_dns_x"]').prop("disabled", true);
 	}
 	inputCtrl(document.form.lan_ipaddr, en_ip);
 	inputCtrl(document.form.lan_netmask, en_ip);
