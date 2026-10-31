@@ -50,5 +50,60 @@ function script(w,relative){w.eval(fs.readFileSync(path.join(W,relative),'utf8')
   const p=await open(page);
   await check('流量刷新不清空已加载数据 '+page,()=>{if(page.includes('realtime')){p.w.netdevs={LAN:{rx:10000,tx:5000}};p.w.eval_netdevs('');assert.equal(p.w.netdevs.LAN.rx,10000);}else if(page.includes('last24')){p.w.speed_history={LAN:{rx:[100,200],tx:[50,60]}};p.w.eval_netdevs('');assert.equal(p.w.speed_history.LAN.rx.length,2);}else{p.w.daily_history=[[20261031,100,200]];p.w.monthly_history=[[202610,300,400]];p.w.eval_history('');assert.equal(p.w.daily_history.length,1);assert.equal(p.w.monthly_history.length,1);}});
  }
+ for(const page of ['Advanced_FirmwareUpgrade_Content.asp','Advanced_SettingBackup_Content.asp','Advanced_AiDisk_ftp.asp','Advanced_AiDisk_samba.asp']){
+  const p=await open(page);
+  await check('非空隐藏弹层脱离排版且保留原入口 '+page,()=>{
+   const overlay=p.d.getElementById(page.includes('AiDisk')?'OverlayMask':'LoadingBar');assert(overlay&&overlay.children.length);
+   assert.equal(p.w.getComputedStyle(overlay).position,'fixed');assert.equal(p.w.getComputedStyle(overlay).visibility,'hidden');
+   if(page.includes('AiDisk')){overlay.style.visibility='visible';assert.equal(p.w.getComputedStyle(overlay).visibility,'visible');overlay.style.visibility='hidden';}
+   else{p.w.showLoadingBar(30);assert.equal(p.w.getComputedStyle(overlay).position,'fixed');assert.equal(p.w.getComputedStyle(overlay).visibility,'visible');p.w.hideLoading();assert.equal(p.w.getComputedStyle(overlay).display,'none');}
+   assert.equal(p.record.submits.length,0);
+  });
+ }
+ const resourcePage=await open('Advanced_SettingBackup_Content.asp'),rw=resourcePage.w,rd=resourcePage.d;
+ rw.clearTimeout(rw.id_system_info);
+ const snapshot=(factor=1)=>({cpu:{total:1000*factor,busy:200*factor,user:100*factor,system:100*factor,idle:800*factor,nice:0,irq:0,sirq:0,iowait:0},ram:{total:1000,used:500,free:500,buffers:50,cached:200},swap:{total:0,used:0},uptime:{days:1,hours:2,minutes:3},lavg:'0.12 0.34 0.56',wifi2:{state:1,guest:0},wifi5:{state:1,guest:1},logmt:0});
+ await check('CPU 使用率按采样差值计算且细分与总量一致',()=>{
+  rw.setSystemInfo(snapshot());let next=snapshot(2);next.cpu.busy=700;next.cpu.user=400;next.cpu.system=300;next.cpu.idle=1300;rw.setSystemInfo(next);
+  assert.equal(rd.getElementById('cpu_info').textContent,'50%');assert.equal(rd.querySelector('[role=meter]').getAttribute('aria-valuenow'),'50.0');
+  assert(rd.querySelector('.ui-cpu-breakdown').textContent.includes('用户程序30%'));assert(rd.querySelector('.ui-cpu-breakdown').textContent.includes('系统内核20%'));
+  assert.equal(rd.querySelector('.ui-resource-idle').textContent,'空闲 50%');
+ });
+ await check('内存四个分类不重复计算缓存，空闲不冒充可用',()=>{
+  const bars=[...rd.querySelectorAll('.ui-memory-meter>span')].map(n=>parseFloat(n.style.width));assert.deepEqual(bars,[25,20,5,50]);assert.equal(bars.reduce((a,b)=>a+b),100);
+  assert(rd.querySelector('.ui-memory-breakdown').textContent.includes('程序与系统250 KiB25%'));assert(rd.querySelector('.ui-memory-breakdown').textContent.includes('空闲500 KiB50%'));
+  assert.equal(rd.querySelector('.ui-swap-line strong').textContent,'未启用');assert(!rd.querySelector('.ui-resource-body').textContent.includes('可用内存 500'));
+ });
+ await check('零增量及计数器重置显示采样中，下一次正常恢复',()=>{
+  const a=snapshot(2);rw.setSystemInfo(a);rw.setSystemInfo(a);assert.equal(rd.getElementById('cpu_info').textContent,'采样中');assert.equal(rd.querySelector('[role=meter]').getAttribute('aria-valuenow'),null);
+  rw.setSystemInfo(snapshot());assert.equal(rd.getElementById('cpu_info').textContent,'采样中');rw.setSystemInfo(snapshot(2));assert.equal(rd.getElementById('cpu_info').textContent,'20%');
+ });
+ await check('无效内存数据不显示负数、无穷值或伪造占用，交换空间单独显示',()=>{
+  let a=snapshot(3);a.ram.total=0;a.swap={total:2048,used:512};rw.setSystemInfo(a);assert.equal(rd.getElementById('mem_info').textContent,'暂不可用');assert.equal(rd.querySelector('.ui-swap-line strong').textContent,'512 KiB / 2.00 MiB');assert(!/NaN|Infinity/.test(rd.querySelector('.ui-resource-body').textContent));
+  a=snapshot(4);a.ram.cached=900;rw.setSystemInfo(a);assert.equal(rd.getElementById('mem_info').textContent,'暂不可用');rw.setSystemInfo(snapshot(5));assert.equal(rd.getElementById('mem_info').textContent,'500 KiB / 1000 KiB');
+ });
+ await check('负载保留 1/5/15 分钟标签且无线与启动时间更新不丢失',()=>{
+  assert.deepEqual([...rd.querySelectorAll('.ui-load-grid dt')].map(n=>n.textContent),['1 分钟','5 分钟','15 分钟']);assert.deepEqual([...rd.querySelectorAll('.ui-load-grid dd')].map(n=>n.textContent),['0.12','0.34','0.56']);
+  assert(rd.getElementById('wifi2_b').classList.contains('btn-info'));assert(!rd.getElementById('wifi2_b_g').classList.contains('btn-info'));assert(rd.getElementById('wifi5_b_g').classList.contains('btn-info'));assert.equal(rd.getElementById('uptime_info').textContent,'1 天 02 时 03 分');
+ });
+ await check('资源明细展开状态只保存在当前浏览器会话',async()=>{
+  rd.querySelector('.ui-metric-details').open=true;await delay(10);assert.equal(rw.sessionStorage.getItem('padavan.resources.open'),'1');assert.equal(resourcePage.record.submits.length,0);
+  rw.show_banner();rw.clearTimeout(rw.id_system_info);assert(rd.querySelector('.ui-metric-details').open);
+ });
+ await check('状态请求失败保留最后读数并提示过期，恢复后重新采样',()=>{
+  rw.setSystemInfo(snapshot(6));rw.setSystemInfo(snapshot(7));const old=rd.getElementById('cpu_info').textContent,ajax=rw.jQuery.ajax,requests=[];
+  rw.jQuery.ajax=()=>{let q=rw.jQuery.Deferred();q.abort=()=>q.reject({},'abort');requests.push(q);return q;};
+  rw.get_system_info();rw.get_system_info();assert.equal(requests.length,1);requests[0].reject({},'timeout');rw.clearTimeout(rw.id_system_info);
+  assert.equal(rd.getElementById('cpu_info').textContent,old);assert(rd.querySelector('.ui-metric-details').classList.contains('ui-resource-stale'));assert(rd.querySelector('.ui-resource-status').textContent.includes('状态更新失败'));
+  rw.get_system_info();requests[1].resolve(snapshot(8));rw.clearTimeout(rw.id_system_info);assert.equal(rd.getElementById('cpu_info').textContent,'采样中');assert(!rd.querySelector('.ui-metric-details').classList.contains('ui-resource-stale'));
+  rw.get_system_info();requests[2].resolve(snapshot(9));rw.clearTimeout(rw.id_system_info);assert.equal(rd.getElementById('cpu_info').textContent,'20%');
+  Object.defineProperty(rd,'hidden',{configurable:true,value:true});rd.dispatchEvent(new rw.Event('visibilitychange'));rw.get_system_info();assert.equal(requests.length,3);assert(rd.querySelector('.ui-resource-status').textContent.includes('暂停刷新'));rw.jQuery.ajax=ajax;
+ });
+ const chartPage=await open('Advanced_System_Info.asp');chartPage.w.clearTimeout(chartPage.w.id_system_info);
+ await check('新资源面板继续向原系统历史图表推送有效采样',()=>{
+  chartPage.w.setSystemInfo(snapshot());chartPage.w.setSystemInfo(snapshot(2));const charts=chartPage.w.arrCharts;
+  assert.equal(charts[0].series[0].data.at(-1)[1],20);assert.equal(charts[1].series[0].data.at(-1)[1],0.49);
+  const n=charts[0].series[0].data.length;chartPage.w.setSystemInfo(snapshot(2));assert.equal(charts[0].series[0].data.length,n);
+ });
  console.log(JSON.stringify({passed:true,count:cases.length,cases}));
 })().catch(e=>{cases.push({name:'failure',passed:false,error:e.stack});console.error(e);process.exitCode=1;}).finally(()=>{windows.forEach(w=>w.close());fs.writeFileSync(path.join(R,'functional-results.json'),JSON.stringify({kind:'jsdom-functional-not-visual',passed:!process.exitCode,cases},null,2));});

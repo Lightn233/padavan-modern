@@ -36,6 +36,10 @@ async function run(page){
   const d=dom.window.document;report.ready=d.readyState;report.shell=!!d.querySelector('.ui-app');report.forms=d.forms.length;report.switches=d.querySelectorAll('[role=switch]').length;
   report.unresolved=[...d.querySelectorAll('script[src],link[rel=stylesheet]')].filter(n=>(n.src||n.href).includes('<%')).map(n=>n.outerHTML);
   report.scriptErrors=dom.window.__errors||[];
+  // 统一检查隐藏弹层的排版条件；这不替代真实浏览器的像素和响应式验收。
+  report.overlays=[...d.querySelectorAll('.popup_bg,.popup_bar_bg')].map(n=>{const style=dom.window.getComputedStyle(n);return {id:n.id,nonempty:!!n.children.length,position:style.position,visibility:style.visibility,display:style.display};});
+  report.overlayFlowErrors=report.overlays.filter(n=>n.display!=='none'&&!['absolute','fixed'].includes(n.position));
+  report.largeInlineGaps=[...d.querySelectorAll('[style]')].filter(n=>!n.closest('.popup_bg,.popup_bar_bg')&&parseFloat(n.style.marginTop)>=100).map(n=>({tag:n.tagName,id:n.id,marginTop:n.style.marginTop}));
  }catch(e){report.errors.push(e.stack);}finally{if(dom)dom.window.close();}
  reports.push(report);console.log(JSON.stringify({page,errors:report.errors,syntax:report.syntax,formDifference:!!report.formDifference,shell:report.shell,switches:report.switches}));
 }
@@ -44,6 +48,6 @@ async function run(page){
  for(let i=0;i<pages.length;i+=3)await Promise.all(pages.slice(i,i+3).map(run));
  const result={kind:'jsdom-not-visual-browser',at:new Date().toISOString(),pages:reports,fixture:await(await fetch(base+'/lab/results')).json()};
  fs.writeFileSync(path.join(root,'dom-results.json'),JSON.stringify(result,null,2));
- console.log(JSON.stringify({pages:reports.length,errorPages:reports.filter(r=>r.errors.length||r.syntax.length).length,formDifferences:reports.filter(r=>r.formDifference).length,unknownHooks:result.fixture.unknown_hooks}));
- if(reports.some(r=>r.errors.length||r.syntax.length||r.formDifference))process.exitCode=1;
+ console.log(JSON.stringify({pages:reports.length,errorPages:reports.filter(r=>r.errors.length||r.syntax.length).length,formDifferences:reports.filter(r=>r.formDifference).length,overlayFlowErrors:reports.filter(r=>r.overlayFlowErrors&&r.overlayFlowErrors.length).length,largeInlineGaps:reports.filter(r=>r.largeInlineGaps&&r.largeInlineGaps.length).map(r=>({page:r.page,gaps:r.largeInlineGaps})),unknownHooks:result.fixture.unknown_hooks}));
+ if(reports.some(r=>r.errors.length||r.syntax.length||r.formDifference||(r.overlayFlowErrors&&r.overlayFlowErrors.length)))process.exitCode=1;
 })().catch(e=>{console.error(e);process.exitCode=1;});
