@@ -61,6 +61,10 @@ function redirect(){
 }
 
 function initial(){
+	if (action_script === "networkmap_refresh" && typeof parent.networkmap_refresh_started === "function") {
+		parent.networkmap_refresh_started();
+		return;
+	}
 	if(getflag == "set_language"){
 		if(navigator.appName.indexOf("Microsoft") >= 0)
 			parent.parent.location.reload();

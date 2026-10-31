@@ -26,6 +26,7 @@
 #define MAX_SUBNET_SCAN		(24) /* 23..24 */
 #define NUM_CLIENTS_SCAN	(1U << (32U - MAX_SUBNET_SCAN))
 #define MAX_CLIENT_ITEMS	4096
+#define SCAN_BATCH_SIZE	8
 
 static NET_CLIENT_LIST net_clients;
 static unsigned char my_hwaddr[8];
@@ -64,8 +65,8 @@ iface_get_id(int fd, const char *device)
 static int
 iface_bind(int fd, int ifindex)
 {
-	int err, flags, alen;
-	socklen_t errlen = sizeof(err);
+	int err, flags;
+	socklen_t errlen = sizeof(err), alen;
 
 	memset(&src_sockll, 0, sizeof(src_sockll));
 	src_sockll.sll_family = AF_PACKET;
@@ -631,28 +632,28 @@ static void
 nmap_iterate(void)
 {
 	if (networkmap_fullscan) {
-		unsigned int scan_addr;
+		unsigned int scan_addr, batch;
 		
 		if (scan_now == 0) {
 			net_clients_reset();
 			nmap_init();
 		}
 		
-		scan_now++;
-		scan_addr = scan_net | scan_now;
-		
-		// Skip our address
-		if (scan_addr == ntohl(my_ipaddr.s_addr)) {
-			scan_now++;
-			scan_addr = scan_net | scan_now;
-		}
-		
-		if (scan_now < scan_max && !scan_block) {
+		/* 每批探测少量地址再收包，避免每个空地址都串行等待 60 毫秒。 */
+		for (batch = 0; batch < SCAN_BATCH_SIZE && !scan_block; batch++) {
 			struct in_addr in;
-			
+			if (++scan_now >= scan_max)
+				break;
+			scan_addr = scan_net | scan_now;
+			if (scan_addr == ntohl(my_ipaddr.s_addr))
+				continue;
 			in.s_addr = htonl(scan_addr);
 			sent_arppacket(arp_sockfd, &in);
-		} else {
+		}
+		/* 先处理本批回复，再发布完成状态，避免最后一批设备晚于页面刷新。 */
+		if (!scan_block)
+			nmap_receive_arp();
+		if (scan_now >= scan_max || scan_block) {
 			struct timeval arp_timeout = {2, 0};
 			setsockopt(arp_sockfd, SOL_SOCKET, SO_RCVTIMEO, &arp_timeout, sizeof(arp_timeout));
 			
@@ -664,6 +665,8 @@ nmap_iterate(void)
 				NMP_DEBUG("fullscan complete!\n");
 			}
 		}
+		if (!scan_block)
+			return;
 	}
 
 	nmap_receive_arp();

@@ -38,6 +38,13 @@ var clients = getclients(1,0);
 var unblocked_clients = new Array();
 var blocked_clients = new Array();
 var page_modified = 0;
+var scan_deadline = 0;
+var scan_timer = null;
+var scan_failures = 0;
+var scan_pending = false;
+var client_request = false;
+var submit_timer = null;
+var scan_snapshot = ipmonitor.slice();
 
 function initial(){
 	if (sw_mode == "3") {
@@ -51,6 +58,9 @@ function initial(){
 
 function prepare_clients(){
 	var i, j, k;
+	// 每次重新生成索引，避免设备离线后沿用上一次扫描的位置。
+	unblocked_clients = [];
+	blocked_clients = [];
 
 	if(typeof parent.show_client_status === 'function')
 		parent.show_client_status(clients.length);
@@ -117,39 +127,78 @@ function prepare_clients(){
 	}
 }
 
+// 主动扫描会逐个探测地址；日常刷新只读取已有结果，不重新扫描。
+function client_status(message){
+	$("LoadingBar").style.display = "block";
+	$("LoadingBar").querySelector('span').textContent = message;
+}
+
+function merge_scan_clients(previous, current){
+	var merged = [], positions = Object.create(null);
+	[previous, current].forEach(function(rows){
+		rows.forEach(function(row){
+			var mac = String(row[1] || '').replace(/:/g, '').toUpperCase();
+			if (!/^[0-9A-F]{12}$/.test(mac)) return;
+			if (positions[mac] === undefined) {
+				positions[mac] = merged.length;
+				merged.push(row);
+			} else merged[positions[mac]] = row;
+		});
+	});
+	return merged;
+}
+
 function check_full_scan_done(){
-	if(nmap_fullscan != "1"){
-		$("LoadingBar").style.display = "none";
-		$("refresh_list").disabled = false;
-		if (sw_mode == "3") {
-			$j('.popover_top').popover({placement: 'top'});
-			$j('.popover_bottom').popover({placement: 'bottom'});
-		}else {
-			$j('.popover_top').popover({placement: 'right'});
-			$j('.popover_bottom').popover({placement: 'right'});
-		}
-	}else{
-		$("LoadingBar").style.display = "block";
-		$("refresh_list").disabled = true;
-		setTimeout("update_clients();", 2000);
+	clearTimeout(scan_timer);
+	var scanning = nmap_fullscan == "1" || scan_pending;
+	$("scan_clients").disabled = scanning;
+	if (scanning){
+		client_status('正在后台扫描，保留已知设备；仍可刷新列表');
+		if (!scan_deadline) scan_deadline = Date.now() + 90000;
+		if (Date.now() >= scan_deadline) { scan_failed(); return; }
+		if (!scan_pending) scan_timer = setTimeout(update_clients, 2000);
+	} else {
+		scan_deadline = 0;
+		scan_failures = 0;
+		scan_snapshot = ipmonitor.slice();
+		$j('.popover_top, .popover_bottom').popover({placement: sw_mode == "3" ? 'top' : 'right'});
 	}
 }
 
-function update_clients(e) {
+function refresh_clients(){
+	if (client_request) return;
+	scan_failures = 0;
+	update_clients();
+}
+
+function update_clients() {
+	if (client_request) return;
+	clearTimeout(scan_timer);
+	client_request = true;
+	$("refresh_list").disabled = true;
 	$j.ajax({
-		url: '/lan_clients.asp',
-		dataType: 'script',
-		error: function(xhr) {
-			;
+		url: '/lan_clients.asp', dataType: 'script', cache: false, timeout: 5000,
+		error: function() {
+			if (++scan_failures >= 3 || !scan_deadline || Date.now() >= scan_deadline) scan_failed();
+			else scan_timer = setTimeout(update_clients, 2000);
 		},
-		success: function(response) {
-			ipmonitor = ipmonitor_last;
+		success: function() {
+			scan_failures = 0;
 			nmap_fullscan = nmap_fullscan_last;
-			clients = [];
+			// 后台扫描会清空并重建结果，完成前按 MAC 合并，不能按名称合并。
+			if (nmap_fullscan == "1" || scan_pending) {
+				scan_snapshot = merge_scan_clients(scan_snapshot, ipmonitor_last);
+				ipmonitor = scan_snapshot.slice();
+			} else ipmonitor = ipmonitor_last;
 			clients = getclients(1,0);
 			prepare_clients();
 			show_clients();
+			client_status('已更新设备列表');
 			check_full_scan_done();
+		},
+		complete: function() {
+			client_request = false;
+			$("refresh_list").disabled = false;
 		}
 	});
 }
@@ -365,7 +414,35 @@ function showLoading(restart_time2){
 	parent.showLoading(restart_time2);
 }
 
+function scan_failed(){
+	clearTimeout(scan_timer);
+	clearTimeout(submit_timer);
+	scan_deadline = 0;
+	scan_pending = false;
+	$("scan_clients").disabled = false;
+	client_status('未能完成更新，保留上次列表；请重试');
+}
+
+function networkmap_refresh_started(){
+	// 提交结果只通知当前子页，外层管理界面保持不变。
+	clearTimeout(submit_timer);
+	scan_pending = false;
+	nmap_fullscan = "1";
+	scan_deadline = Date.now() + 90000;
+	scan_failures = 0;
+	check_full_scan_done();
+}
+
 function networkmap_update(s){
+	if ($("scan_clients").disabled || client_request) return;
+	$("scan_clients").disabled = true;
+	scan_pending = true;
+	scan_snapshot = ipmonitor.slice();
+	scan_deadline = Date.now() + 90000;
+	client_status('正在后台扫描，保留已知设备；仍可刷新列表');
+	clearTimeout(scan_timer);
+	clearTimeout(submit_timer);
+	submit_timer = setTimeout(scan_failed, 15000);
 	document.form.action_mode.value = "";
 	document.form.action_script.value = s;
 	document.form.flag.value = "nodetect";
@@ -409,7 +486,7 @@ function networkmap_update(s){
 <table id="Clients_table" width="100%" align="center" cellpadding="1" class="table">
     <thead>
         <tr>
-            <th colspan="5" style="text-align: center;"><#ConnectedClient#></th>
+            <th colspan="6" style="text-align: center;"><#ConnectedClient#></th>
         </tr>
         <tr>
             <th width="8%"><a href="javascript:sort(0)"><#Type#></a></th>
@@ -428,7 +505,7 @@ function networkmap_update(s){
 <table id="xClients_table" width="100%" align="center" class="table">
     <thead>
         <tr>
-            <th colspan="5" style="text-align: center;"><#BlockedClient#></th>
+            <th colspan="6" style="text-align: center;"><#BlockedClient#></th>
         </tr>
         <tr>
             <th width="8%"><#Type#></th>
@@ -445,14 +522,15 @@ function networkmap_update(s){
 
 <center>
     <input type="button" id="applyClient" class="btn btn-primary span2" onclick="applyRule();" value="<#CTL_apply#>" />
-    <input type="button" id="refresh_list" class="btn btn-info span2" onclick="networkmap_update('networkmap_refresh');" value="<#CTL_refresh#>" />
+    <input type="button" id="refresh_list" class="btn btn-info span2" onclick="refresh_clients();" value="<#CTL_refresh#>" />
+    <input type="button" id="scan_clients" class="btn btn-info" onclick="networkmap_update('networkmap_refresh');" value="扫描新设备" title="主动探测整个局域网，通常需要十几秒；扫描期间仍显示已知设备。" />
 </center>
 
 <div id="alert_block" class="alert alert-danger" style="margin-top:40px; display: none;">
     <p><a href="/Advanced_MACFilter_Content.asp" target="_parent"><#menu5_5_3#></a> <#macfilter_alert_str1#></p>
 </div>
 
-<form method="post" name="form" id="refreshForm" action="/start_apply.htm" target="">
+<form method="post" name="form" id="refreshForm" action="/start_apply.htm" target="applyFrame">
 <input type="hidden" name="sid_list" value="LANHostConfig;">
 <input type="hidden" name="group_id" value="">
 <input type="hidden" name="action_mode" value="">

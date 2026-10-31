@@ -84,3 +84,6 @@
 @media(max-width:1050px){.ui-resource-grid{gap:20px}.ui-resource-card+.ui-resource-card{padding-left:20px}.ui-cpu-breakdown{column-gap:14px}.ui-resource-lead{flex-wrap:wrap}}
 @media(max-width:799px){.ui-resource-grid{grid-template-columns:1fr;gap:24px}.ui-resource-card+.ui-resource-card{padding:20px 0 0;border-left:0;border-top:1px solid var(--line)}.ui-metric-details>summary{flex-wrap:wrap;gap:4px 12px;padding:14px 16px}.ui-resource-title{order:0}.ui-resource-toggle{order:1}.ui-resource-brief{order:2;flex-basis:100%}.ui-resource-body{padding:0 16px 16px}.ui-resource-status{text-align:left}.ui-resource-lead{flex-wrap:nowrap}.ui-resource-number{font-size:30px}}
 @media(max-width:380px){.ui-resource-lead{flex-wrap:wrap}.ui-cpu-breakdown{grid-template-columns:1fr}}
+
+/* 两位时间输入框需留出文字宽度；兼容尚保留内联宽度的定时页面。 */
+input[type=text][maxlength="2"][size="2"]{min-width:3.5em;padding:7px 6px;text-align:center;font-variant-numeric:tabular-nums}
