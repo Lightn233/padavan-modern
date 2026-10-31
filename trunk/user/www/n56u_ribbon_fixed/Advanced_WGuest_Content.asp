@@ -27,7 +27,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/wireless.js"></script>
 <script type="text/javascript" src="/help_wl.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
@@ -36,11 +35,11 @@
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('wl_guest_enable', change_guest_enabled); // change_guest_enabled(1) change_guest_enabled(1)
-	init_itoggle('wl_guest_closed');
-	init_itoggle('wl_guest_ap_isolate');
-	init_itoggle('wl_guest_lan_isolate');
-	init_itoggle('wl_guest_macrule');
+	PadavanUI.switchControl('wl_guest_enable', change_guest_enabled); // change_guest_enabled(1) change_guest_enabled(1)
+	PadavanUI.switchControl('wl_guest_closed');
+	PadavanUI.switchControl('wl_guest_ap_isolate');
+	PadavanUI.switchControl('wl_guest_lan_isolate');
+	PadavanUI.switchControl('wl_guest_macrule');
 });
 
 </script>

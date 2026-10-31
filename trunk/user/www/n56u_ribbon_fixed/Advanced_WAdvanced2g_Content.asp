@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/wireless_2g.js"></script>
 <script type="text/javascript" src="/help_wl.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
@@ -30,8 +29,8 @@
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('rt_greenap');
-	init_itoggle('rt_ap_isolate');
+	PadavanUI.switchControl('rt_greenap');
+	PadavanUI.switchControl('rt_ap_isolate');
 });
 
 </script>

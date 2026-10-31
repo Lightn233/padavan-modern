@@ -158,8 +158,8 @@ function redraw_speed(){
 		if ((typeof(h.rx) === 'undefined') || (typeof(h.tx) === 'undefined'))
 			continue;
 		
-		netChart.series[0].setData(prepareData(x, h.rx), false);
-		netChart.series[1].setData(prepareData(x, h.tx), false);
+		netChart.series[0].setData(prepareData(x, trafficView(h, i).rx), false);
+		netChart.series[1].setData(prepareData(x, trafficView(h, i).tx), false);
 		
 		if (netdev !== i){
 			netdev = i;
@@ -219,15 +219,15 @@ function prepare_array_chart(id){
 	if (h !== undefined){
 		if(id==1){
 			if (typeof(h.tx) !== 'undefined')
-				return prepareData(x, h.tx);
+				return prepareData(x, trafficView(h, netdev).tx);
 		}else{
 			if (typeof(h.rx) !== 'undefined')
-				return prepareData(x, h.rx);
+				return prepareData(x, trafficView(h, netdev).rx);
 		}
 	}
 
 	var data = [], p = 1-parseInt(86400/data_period);
-	for(i = p; i <= 0; i++)
+	for(var i = p; i <= 0; i++)
 		data.push([x+i*data_period*1000, 0]);
 	return data;
 }

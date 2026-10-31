@@ -22,20 +22,19 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('enable_samba', change_smb_enabled);
-	init_itoggle('enable_ftp', change_ftp_enabled);
-	init_itoggle('nfsd_enable');
-	init_itoggle('apps_dms', change_dms_enabled);
-	init_itoggle('apps_itunes');
-	init_itoggle('trmd_enable', change_trmd_enabled);
-	init_itoggle('aria_enable', change_aria_enabled);
+	PadavanUI.switchControl('enable_samba', change_smb_enabled);
+	PadavanUI.switchControl('enable_ftp', change_ftp_enabled);
+	PadavanUI.switchControl('nfsd_enable');
+	PadavanUI.switchControl('apps_dms', change_dms_enabled);
+	PadavanUI.switchControl('apps_itunes');
+	PadavanUI.switchControl('trmd_enable', change_trmd_enabled);
+	PadavanUI.switchControl('aria_enable', change_aria_enabled);
 });
 
 </script>

@@ -28,7 +28,7 @@
 ** Then the 6-bit values are represented using the characters "A-Za-z0-9+/".
 */
 
-static const char b64_decode_table[256] = {
+static const signed char b64_decode_table[256] = {
     -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 00-0F */
     -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,  /* 10-1F */
     -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,  /* 20-2F */
@@ -63,7 +63,8 @@ b64_decode(const char* str, unsigned char* space, int size )
 	space_idx = 0;
 	phase = 0;
 	for ( cp = str; *cp != '\0'; ++cp ) {
-		d = (int)b64_decode_table[(int)*cp];
+		/* 输入字节按无符号索引，兼容有符号 char 的 MIPS 工具链。 */
+		d = (int)b64_decode_table[(unsigned char)*cp];
 		if ( d != -1 ) {
 			switch ( phase )
 			{

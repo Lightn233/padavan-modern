@@ -497,7 +497,7 @@ static int iterate_netdev(const char *ifdesc, int ifindex, int wan_no, long tick
 			memset(sp, 0, sizeof(speed_item_t));
 			strcpy(sp->ifdesc, ifdesc);
 			sp->ifindex = ifindex;
-			sp->tail = g_speed_list.tail;
+			sp->tail = (g_speed_list.tail + (ticks > 0 ? ticks : 0)) % MAX_NSPEED;
 			memcpy(sp->last, counter, sizeof(sp->last));
 			SLIST_INSERT_HEAD(&g_speed_list.head, sp, entries);
 			g_speed_list.count++;
@@ -508,16 +508,16 @@ static int iterate_netdev(const char *ifdesc, int ifindex, int wan_no, long tick
 	if (ticks < 1)
 		return 0;
 
-	if (sp->ifindex != ifindex) {
+	if (sp->ifindex != ifindex || sp->skips) {
+		/* 接口重建或采样中断后重建基线，不能累计新接口的历史计数。 */
 		sp->ifindex = ifindex;
-		memset(sp->last, 0, sizeof(sp->last));
+		memcpy(sp->last, counter, sizeof(sp->last));
 	}
 
 	for (i = 0; i < MAX_COUNTER; ++i) {
 		if (counter[i] < sp->last[i]) {
+			/* 入口是 64 位累计计数；下降时按复位处理，不猜测 32 位回绕。 */
 			diff[i] = 0;
-			if ((sp->last[i] <= 0xFFFFFFFFull) && (sp->last[i] > 0x70000000ull))
-				diff[i] = (0xFFFFFFFFull - sp->last[i]) + counter[i];
 		} else
 			diff[i] = counter[i] - sp->last[i];
 		
@@ -626,6 +626,7 @@ static void process_rstats(void)
 				item->skips += ticks;
 				if (item->skips >= MAX_NSPEED) {
 					SLIST_REMOVE(&g_speed_list.head, item, speed_item, entries);
+					g_speed_list.count--;
 					free(item);
 				}
 			}

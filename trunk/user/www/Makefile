@@ -231,5 +231,6 @@ ifneq ($(CONFIG_FIRMWARE_INCLUDE_SMARTDNS),y)
 	rm -f $(INSTALLDIR)/www/Advanced_smartdns.asp
 endif
 # VPN 页面由 PPTP、L2TP 和 OpenVPN 共用，不随 SoftEther 插件开关裁剪。
+	python3 version-assets.py "$(ROMFS_DIR)/www"
 clean:
 	@echo "Clean www romfs"

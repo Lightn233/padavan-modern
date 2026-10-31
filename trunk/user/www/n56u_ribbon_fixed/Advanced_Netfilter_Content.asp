@@ -22,19 +22,18 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('wan_nat_x', change_nat_enable);
-	init_itoggle('nf_nat_loop');
-    init_itoggle('fw_pt_pppoe');
-	init_itoggle('nf_alg_pptp');
-	init_itoggle('nf_alg_h323');
-	init_itoggle('nf_alg_sip');
+	PadavanUI.switchControl('wan_nat_x', change_nat_enable);
+	PadavanUI.switchControl('nf_nat_loop');
+    PadavanUI.switchControl('fw_pt_pppoe');
+	PadavanUI.switchControl('nf_alg_pptp');
+	PadavanUI.switchControl('nf_alg_h323');
+	PadavanUI.switchControl('nf_alg_sip');
 });
 
 </script>

@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/client_function.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
@@ -32,10 +31,10 @@ var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
 	
-	init_itoggle('aliyundrive_enable');
-	init_itoggle('ald_no_trash');
-	init_itoggle('ald_read_only');
-	init_itoggle('ald_domain_id');
+	PadavanUI.switchControl('aliyundrive_enable');
+	PadavanUI.switchControl('ald_no_trash');
+	PadavanUI.switchControl('ald_read_only');
+	PadavanUI.switchControl('ald_domain_id');
 
 });
 

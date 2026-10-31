@@ -22,15 +22,14 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/wireless_2g.js"></script>
 <script type="text/javascript" src="formcontrol.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('rt_radio_x');
-	init_itoggle('rt_closed');
+	PadavanUI.switchControl('rt_radio_x');
+	PadavanUI.switchControl('rt_closed');
 });
 
 </script>

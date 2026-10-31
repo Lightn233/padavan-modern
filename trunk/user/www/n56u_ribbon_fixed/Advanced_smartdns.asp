@@ -22,40 +22,38 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
-
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
 <% smartdns_status(); %>
 
 $j(document).ready(function(){
-	init_itoggle('sdns_enable');
-	init_itoggle('sdns_tcp_server');
-	init_itoggle('sdns_ipv6_server');
-	init_itoggle('snds_ip_change');
-	init_itoggle('sdns_cache_persist');
-	init_itoggle('sdns_www');
-	init_itoggle('sdns_ipv6');
-	init_itoggle('sdns_exp');
-	init_itoggle('sdnse_enable');
-	init_itoggle('sdnse_address');
-	init_itoggle('sdns_address');
-	init_itoggle('sdnse_tcp');
-	init_itoggle('sdnse_as');
-	init_itoggle('sdns_as');
-	init_itoggle('sdnse_speed');
-	init_itoggle('sdns_speed');
-	init_itoggle('sdnse_ns');
-	init_itoggle('sdns_ns');
-	init_itoggle('sdnse_ipc');
-	init_itoggle('sdnse_ipset');
-	init_itoggle('sdns_ipset');
-	init_itoggle('sdnse_cache');
-	init_itoggle('sdns_coredump');
-	init_itoggle('ss_black');
-	init_itoggle('ss_white');
-	init_itoggle('sdnss_enable_x_0');
+	PadavanUI.switchControl('sdns_enable');
+	PadavanUI.switchControl('sdns_tcp_server');
+	PadavanUI.switchControl('sdns_ipv6_server');
+	PadavanUI.switchControl('snds_ip_change');
+	PadavanUI.switchControl('sdns_cache_persist');
+	PadavanUI.switchControl('sdns_www');
+	PadavanUI.switchControl('sdns_ipv6');
+	PadavanUI.switchControl('sdns_exp');
+	PadavanUI.switchControl('sdnse_enable');
+	PadavanUI.switchControl('sdnse_address');
+	PadavanUI.switchControl('sdns_address');
+	PadavanUI.switchControl('sdnse_tcp');
+	PadavanUI.switchControl('sdnse_as');
+	PadavanUI.switchControl('sdns_as');
+	PadavanUI.switchControl('sdnse_speed');
+	PadavanUI.switchControl('sdns_speed');
+	PadavanUI.switchControl('sdnse_ns');
+	PadavanUI.switchControl('sdns_ns');
+	PadavanUI.switchControl('sdnse_ipc');
+	PadavanUI.switchControl('sdnse_ipset');
+	PadavanUI.switchControl('sdns_ipset');
+	PadavanUI.switchControl('sdnse_cache');
+	PadavanUI.switchControl('sdns_coredump');
+	PadavanUI.switchControl('ss_black');
+	PadavanUI.switchControl('ss_white');
+	PadavanUI.switchControl('sdnss_enable_x_0');
 		$j("#tab_sm_cfg, #tab_sm_exp, #tab_sm_sec, #tab_sm_dns, #tab_sm_cou").click(function(){
 		var newHash = $j(this).attr('href').toLowerCase();
 		showTab(newHash);

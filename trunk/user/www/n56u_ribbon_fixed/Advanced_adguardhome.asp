@@ -22,17 +22,17 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 
 <script src="/adguardhome_backup_ui.js"></script>
+<script src="/adguardhome_status_ui.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
 
-	init_itoggle('adg_enable');
+	PadavanUI.switchControl('adg_enable');
 
 });
 
@@ -47,6 +47,7 @@ function initial(){
 	showmenu();
 	show_footer();
 	aghBackupRefresh();
+	aghWebRefresh();
 
 }
 
@@ -140,7 +141,7 @@ function done_validating(action){
 									<div class="alert alert-info" style="margin: 10px;">
 									<p>AdGuard Home 是一款全网广告拦截与反跟踪软件。在您将其安装完毕后，它将保护您所有家用设备，同时您不再需要安装任何客户端软件。随着物联网与连接设备的兴起，掌控您自己的整个网络环境变得越来越重要。默认用户名密码均为adguardhome，可在/etc/storage/AdGuardHome.yaml内修改。
 									</p>
-									AdGuard Home  主页<a href="https://adguard.com/" target="blank"><i><u>https://adguard.com/</u></i></a>
+									AdGuard Home 主页：<a href="https://github.com/AdguardTeam/AdGuardHome" target="_blank" rel="noopener noreferrer">GitHub 官方项目</a>
 									</div>
 
 									<table width="100%" align="center" cellpadding="4" cellspacing="0" class="table">
@@ -179,7 +180,8 @@ function done_validating(action){
 <tr>
 											<th>WEB管理地址:</th>
 											<td>
-											<a href="http://<% nvram_get_x("", "lan_ipaddr"); %>:3000" target="_blank">http://<% nvram_get_x("", "lan_ipaddr"); %>:3000</a>
+											<a id="agh_web_link" target="_blank" rel="noopener noreferrer" hidden></a>
+                                                <div id="agh_web_state" class="help-block" role="status">正在读取服务状态…</div>
 											</td>
 										</tr>
 										

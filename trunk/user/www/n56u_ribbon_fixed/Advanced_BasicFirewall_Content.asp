@@ -22,24 +22,23 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('fw_enable_x', firewall_changed);
-	init_itoggle('fw_dos_x');
-	init_itoggle('fw_syn_cook');
-	init_itoggle('misc_ping_x');
-	init_itoggle('misc_http_x', http_wopen_changed);
-	init_itoggle('https_wopen', https_wopen_changed);
-	init_itoggle('sshd_wopen', sshd_wopen_changed);
-	init_itoggle('ftpd_wopen', ftpd_wopen_changed);
-	init_itoggle('udpxy_wopen', udpxy_wopen_changed);
-	init_itoggle('trmd_ropen');
-	init_itoggle('aria_ropen');
+	PadavanUI.switchControl('fw_enable_x', firewall_changed);
+	PadavanUI.switchControl('fw_dos_x');
+	PadavanUI.switchControl('fw_syn_cook');
+	PadavanUI.switchControl('misc_ping_x');
+	PadavanUI.switchControl('misc_http_x', http_wopen_changed);
+	PadavanUI.switchControl('https_wopen', https_wopen_changed);
+	PadavanUI.switchControl('sshd_wopen', sshd_wopen_changed);
+	PadavanUI.switchControl('ftpd_wopen', ftpd_wopen_changed);
+	PadavanUI.switchControl('udpxy_wopen', udpxy_wopen_changed);
+	PadavanUI.switchControl('trmd_ropen');
+	PadavanUI.switchControl('aria_ropen');
 });
 
 </script>

@@ -98,6 +98,14 @@ function updateTab(h)
 
 	if ((typeof(h.rx) === 'undefined') || (typeof(h.tx) === 'undefined'))
 		return;
+	h = trafficView(h, netdev);
+	if (!h.rx.length || !h.tx.length) {
+		['rx','tx'].forEach(function(direction){
+			['current','avg','max'].forEach(function(field){E(direction+'-'+field).textContent='—';});
+			E(direction+'-total').textContent=bytesToIEC(h[direction+'_total'] || 0, 2);
+		});
+		return;
+	}
 
 	E('rx-current').innerHTML = bytesToBitrate(h.rx[h.rx.length - 1], 2);
 	E('rx-avg').innerHTML = bytesToBitrate(h.rx_avg, 2);
@@ -144,7 +152,7 @@ function processTabs()
 			if (tabs[i][0] != tabs_old[i][0])
 				break;
 		}
-		changed = (i > 0);
+		changed = (i >= 0);
 	}else
 		changed = 1;
 
@@ -161,4 +169,19 @@ function getTabDesc(dev_name){
 
 function invoke_timer(s){
 	idTimerPoll = setTimeout('load_netdevs()', s*1000);
+}
+
+/* 以终端为观察方向：LAN/AP 收到的是上传，WAN 收到的是下载。 */
+function trafficReceiveIsUpload(ifdesc){
+	return ifdesc === 'LAN' || /^WLAN[25]_AP[01]$/.test(ifdesc) || /^ESW_P[1-7]$/.test(ifdesc);
+}
+
+function trafficView(h, ifdesc){
+	if (!h || !trafficReceiveIsUpload(ifdesc)) return h;
+	var view = {};
+	Object.keys(h).forEach(function(key){
+		var target = key.replace(/^(rx|tx)(_|$)/,function(_,dir,end){return (dir==='rx'?'tx':'rx')+end;});
+		view[target]=h[key];
+	});
+	return view;
 }

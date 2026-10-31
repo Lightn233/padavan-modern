@@ -1,3 +1,4 @@
+/* 设备状态参数与通用校验；界面和轮询仅在 ui/state-modern.js 实现一次。 */
 var sw_mode = '<% nvram_get_x("", "sw_mode"); %>';
 var wan_route_x = '<% nvram_get_x("", "wan_route_x"); %>';
 var wan_proto = '<% nvram_get_x("", "wan_proto"); %>';
@@ -84,42 +85,6 @@ function notify_status_vpn_client(vpnc_state){
 		update_vpnc_status(vpnc_state);
 }
 
-function get_changed_status(){
-	var $j = jQuery.noConflict();
-	$j.ajax({
-		type: 'get',
-		url: '/status_internet.asp',
-		dataType: 'script',
-		cache: true,
-		error: function(xhr) {
-			;
-		},
-		success: function(response) {
-			notify_status_internet(now_wan_internet);
-			notify_status_vpn_client(now_vpnc_state);
-			enableCheckChangedStatus();
-		}
-	});
-}
-
-function get_system_info(){
-	var $j = jQuery.noConflict();
-	clearTimeout(id_system_info);
-	$j.ajax({
-		type: 'get',
-		url: '/system_status_data.asp',
-		dataType: 'script',
-		cache: true,
-		error: function(xhr) {
-			id_system_info = setTimeout('get_system_info()', 2000);
-		},
-		success: function(response) {
-			id_system_info = setTimeout('get_system_info()', 2000);
-			setSystemInfo(response);
-		}
-	});
-}
-
 function bytesToSize(bytes, precision){
 	var absval = Math.abs(bytes);
 	var kilobyte = 1024;
@@ -139,92 +104,6 @@ function bytesToSize(bytes, precision){
 		return (bytes / terabyte).toFixed(precision) + ' TB';
 }
 
-function getLALabelStatus(num){
-	var la = parseFloat(num);
-	return la > 0.9 ? 'danger' : (la > 0.5 ? 'warning' : 'info');
-}
-
-function setSystemInfo(response){
-	if(typeof(si_new) !== 'object')
-		return;
-
-	var cpu_now = {};
-	var cpu_total = (si_new.cpu.total - sysinfo.cpu.total);
-	if (!cpu_total)
-		cpu_total = 1;
-
-	cpu_now.busy = parseInt((si_new.cpu.busy - sysinfo.cpu.busy) * 100 / cpu_total);
-	cpu_now.user = parseInt((si_new.cpu.user - sysinfo.cpu.user) * 100 / cpu_total);
-	cpu_now.nice = parseInt((si_new.cpu.nice - sysinfo.cpu.nice) * 100 / cpu_total);
-	cpu_now.system = parseInt((si_new.cpu.system - sysinfo.cpu.system) * 100 / cpu_total);
-	cpu_now.idle = parseInt((si_new.cpu.idle - sysinfo.cpu.idle) * 100 / cpu_total);
-	cpu_now.iowait = parseInt((si_new.cpu.iowait - sysinfo.cpu.iowait) * 100 / cpu_total);
-	cpu_now.irq = parseInt((si_new.cpu.irq - sysinfo.cpu.irq) * 100 / cpu_total);
-	cpu_now.sirq = parseInt((si_new.cpu.sirq - sysinfo.cpu.sirq) * 100 / cpu_total);
-
-	sysinfo = si_new;
-
-	showSystemInfo(cpu_now,1);
-}
-
-function showSystemInfo(cpu_now,force){
-	var $j = jQuery.noConflict();
-	var arrLA = sysinfo.lavg.split(' ');
-	var h = sysinfo.uptime.hours < 10 ? ('0'+sysinfo.uptime.hours) : sysinfo.uptime.hours;
-	var m = sysinfo.uptime.minutes < 10 ? ('0'+sysinfo.uptime.minutes) : sysinfo.uptime.minutes;
-
-	$j("#la_info").html('<span class="label label-'+getLALabelStatus(arrLA[0])+'">'+arrLA[0]+'</span>&nbsp;<span class="label label-'+getLALabelStatus(arrLA[1])+'">'+arrLA[1]+'</span>&nbsp;<span class="label label-'+getLALabelStatus(arrLA[2])+'">'+arrLA[2]+'</span>');
-	$j("#cpu_info").html(cpu_now.busy + '%');
-	$j("#mem_info").html(bytesToSize(sysinfo.ram.free*1024, 2) + " / " + bytesToSize(sysinfo.ram.total*1024, 2));
-	$j("#uptime_info").html(sysinfo.uptime.days + "<#Day#>".substring(0,1) + " " + h+"<#Hour#>".substring(0,1) + " " + m+"<#Minute#>".substring(0,1));
-
-	$j("#cpu_usage tr:nth-child(1) td:first").html('busy: '+cpu_now.busy+'%');
-	$j("#cpu_usage tr:nth-child(2) td:first").html('user: '+cpu_now.user+'%');
-	$j("#cpu_usage tr:nth-child(2) td:last").html('system: '+cpu_now.system+'%');
-	$j("#cpu_usage tr:nth-child(3) td:first").html('sirq: '+cpu_now.sirq+'%');
-	$j("#cpu_usage tr:nth-child(3) td:last").html('irq: '+cpu_now.irq+'%');
-	$j("#cpu_usage tr:nth-child(4) td:first").html('idle: '+cpu_now.idle+'%');
-	$j("#cpu_usage tr:nth-child(4) td:last").html('nice: '+cpu_now.nice+'%');
-
-	$j("#mem_usage tr:nth-child(1) td:first").html('total: '+bytesToSize(sysinfo.ram.total*1024, 2));
-	$j("#mem_usage tr:nth-child(2) td:first").html('free: '+bytesToSize(sysinfo.ram.free*1024, 2));
-	$j("#mem_usage tr:nth-child(2) td:last").html('used: '+bytesToSize(sysinfo.ram.used*1024, 2));
-	$j("#mem_usage tr:nth-child(3) td:first").html('cached: '+bytesToSize(sysinfo.ram.cached*1024, 2));
-	$j("#mem_usage tr:nth-child(3) td:last").html('buffers: '+bytesToSize(sysinfo.ram.buffers*1024, 2));
-	$j("#mem_usage tr:nth-child(4) td:first").html('swap: '+bytesToSize(sysinfo.swap.total*1024, 2));
-	$j("#mem_usage tr:nth-child(4) td:last").html('swap used: '+bytesToSize(sysinfo.swap.used*1024, 2));
-
-	if(parseInt(sysinfo.wifi2.state) > 0)
-		$j('#wifi2_b').addClass('btn-info');
-	else
-		$j('#wifi2_b').removeClass('btn-info');
-
-	if(parseInt(sysinfo.wifi5.state) > 0)
-		$j('#wifi5_b').addClass('btn-info');
-	else
-		$j('#wifi5_b').removeClass('btn-info');
-
-	if ('<% nvram_get_x("", "sdns_enable"); %>' == '1')
-		$j('#button_script2').addClass('btn-info');
-	else
-		$j('#button_script2').removeClass('btn-info');
-
-	if(parseInt(sysinfo.wifi2.guest) > 0)
-		$j('#wifi2_b_g').addClass('btn-info');
-	else
-		$j('#wifi2_b_g').removeClass('btn-info');
-
-	if(parseInt(sysinfo.wifi5.guest) > 0)
-		$j('#wifi5_b_g').addClass('btn-info');
-	else
-		$j('#wifi5_b_g').removeClass('btn-info');
-
-	setLogStamp(sysinfo.logmt);
-
-	if(force && typeof(parent.getSystemJsonData) === 'function')
-		getSystemJsonData(cpu_now, sysinfo.ram);
-}
-
 var menu_code="", menu1_code="", menu2_code="", tab_code="", footer_code;
 var enabled2Gclass = '<% nvram_match_x("","rt_radio_x", "1", "btn-info"); %>';
 var enabled5Gclass = '<% nvram_match_x("","wl_radio_x", "1", "btn-info"); %>';
@@ -233,156 +112,6 @@ var enabledGuest5Gclass = '<% nvram_match_x("","wl_guest_enable", "1", "btn-info
 var enabledBtnCommit = '<% nvram_match_x("","nvram_manual", "0", "display:none;"); %>';
 
 // L3 = The third Level of Menu
-function show_banner(L3){
-	var bc = '';
-	var style_2g = 'width:55px;';
-	var style_5g = 'width:55px;';
-	if (!support_5g_radio()) {
-		style_2g = 'width:114px;';
-		style_5g = 'width:21px;display:none;';
-	}
-	var title_2g = '"2.4G"'
-	if (!support_2g_radio()) {
-		title_2g = '"N/A" disabled';
-	}
-
-	// log panel
-	if (!is_mobile && log_float != '0'){
-		bc += '<div class="syslog_panel">\n';
-		bc += '<button id="syslog_panel_button" class="handle" href="/"><span class="log_text">Log</span></button>\n';
-		bc += '<table class="" style="margin-top: 0px; margin-bottom: 5px" width="100%" border="0">\n';
-		bc += '  <tr>\n';
-		bc += '    <td width="60%" style="text-align: left"><b><#General_x_SystemTime_itemname#>:</b><span class="alert alert-info" style="margin-left: 10px; padding-top: 4px; padding-bottom: 4px;" id="system_time_log_area"></span></td>\n';
-		bc += '    <td style="text-align: lift"><input type="hidden" id="scrATop" value=""></td>\n';
-		bc += '    <td style="text-align: right"><button type="button" id="clearlog_btn" class="btn btn-info" style="min-width: 170px;" onclick="clearlog();"><#CTL_clear#></button></td>\n';
-		bc += '  </tr>\n';
-		bc += '</table>\n';
-		bc += '<span><textarea rows="28" wrap="off" class="span12" readonly="readonly" id="log_area"></textarea></span>\n';
-		bc += '</div>\n';
-	}
-
-	// for chang language
-	bc +='<form method="post" name="titleForm" id="titleForm" action="/start_apply.htm" target="hidden_frame">\n';
-	bc +='<input type="hidden" name="current_page" value="">\n';
-	bc +='<input type="hidden" name="sid_list" value="LANGUAGE;">\n';
-	bc +='<input type="hidden" name="action_mode" value=" Apply ">\n';
-	bc +='<input type="hidden" name="preferred_lang" value="">\n';
-	bc +='<input type="hidden" name="flag" value="">\n';
-	bc +='</form>\n';
-
-	// --->
-	bc += '<div class="container-fluid" style="padding-left: 0px; margin-left: -6px;">\n';
-	bc += '<div class="row-fluid">\n';
-
-	// block system info
-	bc += '<div class="span6">\n';
-	bc += '<div class="well" style="margin-bottom: 0px; height: 109px; padding: 7px 6px 6px 6px;">\n';
-	bc += '<div class="row-fluid">\n';
-
-	bc += '<div id="main_info">\n';
-	bc += '<table class="table table-condensed" width="100%" style="margin-bottom: 0px;">\n';
-	bc += '  <tr>\n';
-	bc += '    <td width="43%" style="border: 0 none;"><#SI_LoadAvg#></td>\n';
-	bc += '    <td style="border: 0 none; min-width: 115px;"><div id="la_info"> -- -- -- </div></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td style="height: 20px;"><a class="adv_info" href="javascript:void(0)" onclick="click_info_cpu();"><#SI_LoadCPU#></a></td>\n';
-	bc += '    <td><span id="cpu_info"> -- % </span></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td><a class="adv_info" href="javascript:void(0)" onclick="click_info_mem();"><#SI_FreeMem#></a></td>\n';
-	bc += '    <td><span id="mem_info"> -- MB / -- MB </span></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td><#SI_Uptime#></td>\n';
-	bc += '    <td><span id="uptime_info">&nbsp;</span></td>\n';
-	bc += '  </tr>\n';
-	bc += '</table>\n';
-	bc += '</div>\n';
-
-	bc += '<div id="cpu_usage" style="display: none;">\n';
-	bc += '<table class="table table-condensed" width="100%" style="margin-bottom: 0px;">\n';
-	bc += '  <tr>\n';
-	bc += '    <td width="43%" style="text-align:left; border: 0 none;"></td>\n';
-	bc += '    <td style="border: 0 none; text-align:right;"><a class="label" href="javascript:void(0)" onclick="hide_adv_info();">hide</a></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td style="height: 20px;"></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '</table>\n';
-	bc += '</div>\n';
-
-	bc += '<div id="mem_usage" style="display: none;">\n';
-	bc += '<table class="table table-condensed" width="100%" style="margin-bottom: 0px;">\n';
-	bc += '  <tr>\n';
-	bc += '    <td width="43%" style="text-align:left; border: 0 none;"></td>\n';
-	bc += '    <td style="border: 0 none; text-align:right;"><a class="label" href="javascript:void(0)" onclick="hide_adv_info();">hide</a></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td style="height: 20px;"></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td></td>\n';
-	bc += '    <td></td>\n';
-	bc += '  </tr>\n';
-	bc += '</table>\n';
-	bc += '</div>\n';
-
-	bc += '</div>\n';
-	bc += '</div>\n';
-	bc += '</div>\n';
-
-	// block firmware version
-	bc += '<div class="span6">\n';
-	bc += '<div class="well" style="margin-bottom: 0px; height: 109px; padding: 5px 6px 8px 6px;">\n';
-	bc += '<div class="row-fluid">\n';
-	bc += '<table class="table table-condensed" style="margin-bottom: 0px">\n';
-	bc += '  <tr>\n';
-	bc += '    <td width="50%" style="border: 0 none;"><#menu5_1#>:</td>\n';
-	bc += '    <td style="border: 0 none; min-width: 115px;"><div class="form-inline"><input type="button" id="wifi2_b" class="btn btn-mini '+enabled2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_setting(2);">&nbsp;<input type="button" id="wifi5_b" style="'+style_5g+'" class="btn btn-mini '+enabled5Gclass+'" value="5G" onclick="go_setting(5);"></div></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td><#menu5_1_2#>:</td>\n';
-	bc += '    <td><div class="form-inline"><input type="button" id="wifi2_b_g" class="btn btn-mini '+enabledGuest2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_wguest(2);">&nbsp;<input type="button" id="wifi5_b_g" style="'+style_5g+'" class="btn btn-mini '+enabledGuest5Gclass+'" value="5G" onclick="go_wguest(5);"></div></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td><#General_x_FirmwareVersion_itemname#></td>\n';
-	bc += '    <td><a href="/Advanced_FirmwareUpgrade_Content.asp"><span id="firmver" class="time"></span></a></td>\n';
-	bc += '  </tr>\n';
-	bc += '  <tr>\n';
-	bc += '    <td><button type="button" id="commit_btn" class="btn btn-mini" style="width: 114px; height: 21px; outline:0; '+enabledBtnCommit+'" onclick="commit();"><i class="icon icon-fire"></i>&nbsp;<#CTL_Commit#></button></td>\n';
-	bc += '    <td><button type="button" id="logout_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#t1Logout#>" onclick="logout();"><i class="icon icon-user"></i></button> <button type="button" id="reboto_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_REBOOT#>" onclick="reboot();"><i class="icon icon-repeat"></i></button> <button type="button" id="freememory_trash" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_FREEMEMORY#>" onclick="freememory();"><i class="icon icon-trash"></i></button></td>\n';
-	bc += '  </tr>\n';
-	bc += '</table>\n';
-	bc += '</div>\n';
-	bc += '</div>\n';
-	bc += '</div>\n';
-
-	bc += '</div>\n';
-	bc += '</div>\n';
-
-	bc +='</td></tr></table>\n';
-
-	$("TopBanner").innerHTML = bc;
-
-	show_loading_obj();
-	show_top_status();
-}
-
 var tabtitle = new Array(20);
 var tablink = new Array(20);
 tabtitle[0] = new Array("", "<#menu5_1_1#>", "<#menu5_1_2#>", "<#menu5_1_3#>", "<#menu5_1_4#>", "<#menu5_1_5#>", "<#menu5_1_6#>");
@@ -737,43 +466,6 @@ function show_menu(L1, L2, L3){
 		$("tabMenu").innerHTML = "";
 }
 
-function show_footer(){
-	footer_code = '<div align="center" class="bottom-image"></div>\n';
-	footer_code +='<div align="center" class="copyright"><#footer_copyright_desc#></div>\n';
-	footer_code +='<div align="center">\n';
-	footer_code +='  <span>RouterChart by Torstein Hønsi & <a href="http://www.highcharts.com">Highsoft</a></span></br>\n';
-	footer_code +='  <span>Big icons designed by <a href="http://www.freepik.com">Freepik</a></br></span>\n';
-	footer_code +='  <span>Non-Commercial Use Only</span></br>\n';
-	footer_code +='</div>\n';
-
-	$("footer").innerHTML = footer_code;
-
-	flash_button();
-}
-
-function show_top_status(){
-	var $j = jQuery.noConflict();
-
-	$j("#cpu_info").click(function(){
-		$j("#main_info").hide();
-		$j("#cpu_usage").show();
-	});
-	$j("#mem_info").click(function(){
-		$j("#main_info").hide();
-		$j("#mem_usage").show();
-	});
-
-	id_system_info = setTimeout('get_system_info()', 2000);
-	showSystemInfo({busy: 0, user: 0, nice: 0, system: 0, idle: 0, iowait: 0, irq: 0, sirq: 0}, 0);
-
-	showtext($("firmver"), '<% nvram_get_x("",  "firmver_sub"); %>');
-
-	/*if(sw_mode == "3")
-		$("sw_mode_span").innerHTML = "AP";
-	else
-		$("sw_mode_span").innerHTML = "Router";*/
-}
-
 function go_setting(band){
 	if(band == "2")
 		location.href = "Advanced_Wireless2g_Content.asp";
@@ -788,37 +480,10 @@ function go_wguest(band){
 		location.href = "Advanced_WGuest_Content.asp";
 }
 
-function show_time(){
-	JS_timeObj.setTime(systime_millsec); // Add millsec to it.
-	JS_timeObj3 = JS_timeObj.toString();
-	JS_timeObj3 = checkTime(JS_timeObj.getHours()) + ":" +
-			checkTime(JS_timeObj.getMinutes()) + ":" +
-			checkTime(JS_timeObj.getSeconds());
-	$('systemtime').innerHTML ="<a href='/Advanced_System_Content.asp'>" + JS_timeObj3 + "</a>";
-	systime_millsec += 1000;
-	stime_ID = setTimeout("show_time();", 1000);
-}
-
 function checkTime(i){
 	if (i<10)
 		{i="0" + i}
 	return i;
-}
-
-function show_loading_obj(){
-	var code = '';
-
-	code += '<center><div id="loadingBlock" class="loadingBlock">';
-	code += '<div class="container-fluid">';
-	code += '<div class="well" style="background-color: #212121; width: 60%;">';
-	code += '<div class="progress progress-striped active" style="width: 50%; text-align: left;"><div class="bar" id="proceeding_bar" style="width: 0%;"><span id="proceeding_txt"></span></div></div>';
-	code += '<span id="proceeding_main_txt"><#Main_alert_proceeding_desc4#></span></span>';
-	code += '</div>';
-	code += '</div>';
-	code += '</div></center>';
-
-	$("Loading").innerHTML = code;
-	// 初始遮罩由样式隐藏，不能用旧计时器关闭后来启动的等待流程。
 }
 
 function submit_language(){
@@ -841,80 +506,10 @@ function submit_language(){
 	}
 }
 
-function logout(){
-	if(!confirm('<#JS_logout#>'))
-		return;
-	setTimeout('location = "Logout.asp";', 1);
-}
-
-function reboot(){
-	if(!confirm('<#Main_content_Login_Item7#>'))
-		return;
-	uiRebootWait({done:function(){location.href="/";}});
-	var $j = jQuery.noConflict();
-	$j.post('/apply.cgi',
-	{
-		'action_mode': ' Reboot ',
-	});
-}
-
-function freememory(){
-	var $j = jQuery.noConflict();
-	$j.post('/apply.cgi',
-	{
-		'action_mode': ' FreeMemory ',
-		'current_page': 'Main_LogStatus_Content.asp'
-	});
-}
-
-function click_info_cpu(){
-	location.href="/Advanced_System_Info.asp#CPU";
-}
-
-function click_info_mem(){
-	location.href="/Advanced_System_Info.asp#MEM";
-}
-
-function hide_adv_info(){
-	var $j = jQuery.noConflict();
-	$j("#cpu_usage").hide();
-	$j("#mem_usage").hide();
-	$j("#main_info").show();
-}
-
 function reset_btn_commit(btn_id){
 	var $j = jQuery.noConflict();
 	var $btn=$j('#'+btn_id);
 	$btn.removeClass('alert-error').removeClass('alert-success');
-}
-
-function commit(){
-	if(!confirm('<#Commit_confirm#>'))
-		return;
-	var $j = jQuery.noConflict();
-	var $btn = $j('#commit_btn');
-	$j.ajax({
-		type: "post",
-		url: "/apply.cgi",
-		data: {
-			action_mode: " CommitFlash ",
-			nvram_action: "commit_nvram"
-		},
-		dataType: "json",
-		error: function(xhr) {
-			$btn.addClass('alert-error');
-			setTimeout("reset_btn_commit('#commit_btn')", 1500);
-		},
-		success: function(response) {
-			var sys_result = (response != null && typeof response === 'object' && "sys_result" in response)
-				? response.sys_result : -1;
-			if(sys_result == 0)
-				$btn.addClass('alert-success');
-			else
-				$btn.addClass('alert-error');
-			setTimeout("reset_btn_commit('commit_btn')", 1500);
-		}
-	});
 }
 
 function clearlog(){
@@ -1294,91 +889,6 @@ jQuery(document).ready(function(){
 // fix for ie
 String.prototype.nl2br = function(){
     return this.replace(/\n/g, "\n\r");
-}
-
-function setLogStamp(mt){
-    if(is_mobile || log_float == '0')
-        return;
-
-    var $j = jQuery.noConflict();
-
-    if(isLocalStorageAvailable())
-        log_stamp = localStorage.getItem('syslog_stamp');
-    if(log_stamp == null)
-        log_stamp = 0;
-
-    if (log_stamp != mt){
-        setToLocalStorage('syslog_stamp', mt);
-        if (log_stamp != 0){
-            setLogData();
-            if(!$j('.syslog_panel').hasClass('open')){
-                var tabText = 'Log <span class="label label-important">!</span>';
-                $j(".log_text").html(tabText);
-            }
-        }
-        log_stamp = mt;
-    }
-}
-
-function setLogData(){
-    var $j = jQuery.noConflict();
-    $j.get('/log_content.asp', function(data){
-        // fix for ie
-        if($j.browser.msie && !is_ie11p)
-            data = data.nl2br();
-        if($j("#log_area").val() == ''){
-            $j("#log_area").text(data);
-            $j("#log_area").prop('scrollTop', $j("#log_area").prop('scrollHeight'));
-            $j("#scrATop").val($j("#log_area").prop('scrollTop'));
-        }else{
-            var scrMaxTop = $j("#log_area").prop('scrollHeight')
-            var scrTop = $j("#log_area").prop('scrollTop');
-            $j("#log_area").text(data);
-            var scrITop = scrMaxTop - scrTop;
-            if($j("#scrATop").val() == scrTop || scrITop < 629){
-                $j("#log_area").prop('scrollTop', scrMaxTop);
-                $j("#scrATop").val($j("#log_area").prop('scrollTop'));
-            }else{
-                $j("#log_area").prop('scrollTop', scrTop);
-            }
-        }
-    });
-}
-
-function showClockLogArea(){
-    if(jQuery('#system_time').length == 0){
-        JS_timeObj.setTime(systime_millsec);
-        systime_millsec += 1000;
-
-        JS_timeObj2 = JS_timeObj.toString();
-        JS_timeObj2 = JS_timeObj2.substring(0,3) + ", " +
-        JS_timeObj2.substring(4,10) + "  " +
-        checkTime(JS_timeObj.getHours()) + ":" +
-        checkTime(JS_timeObj.getMinutes()) + ":" +
-        checkTime(JS_timeObj.getSeconds()) + "  " +
-        JS_timeObj.getFullYear() + " GMT" + timezone;
-    }
-    jQuery("#system_time_log_area").html(JS_timeObj2);
-    setTimeout("showClockLogArea()", 1000);
-}
-
-function onCompleteSlideOutLogArea(){
-    var idTimeout = setTimeout(function(){
-        clearTimeout(idTimeout);
-        jQuery(".log_text").html('Log');
-    }, 1500);
-}
-
-function passwordShowHide(id){
-    var obj = $j('#'+id);
-    var changeTo = (obj.attr('type') == 'password') ? 'text' : 'password';
-    if ($j.browser.msie && parseInt($j.browser.version, 10) < 9){
-        var marker = $j('<span />').insertBefore('#'+id);
-        obj.detach().attr('type', changeTo).insertAfter(marker);
-        marker.remove();
-    }else{
-        document.getElementById(id).type = changeTo;
-    }
 }
 
 /**

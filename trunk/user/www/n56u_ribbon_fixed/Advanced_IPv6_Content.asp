@@ -22,15 +22,14 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('ip6_dns_auto', change_ip6_dns_auto);
-	init_itoggle('ip6_lan_auto', change_ip6_lan_auto);
-	init_itoggle('ip6_lan_radv', change_ip6_lan_radv);
+	PadavanUI.switchControl('ip6_dns_auto', change_ip6_dns_auto);
+	PadavanUI.switchControl('ip6_lan_auto', change_ip6_lan_auto);
+	PadavanUI.switchControl('ip6_lan_radv', change_ip6_lan_radv);
 });
 
 </script>

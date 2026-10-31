@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/client_function.js"></script>
 <script type="text/javascript" src="/help.js"></script>
@@ -30,11 +29,11 @@
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('dhcp_enable_x');
-	init_itoggle('lan_dhcpd_x');
-	init_itoggle('dhcp_static_x', change_dhcp_static_enabled);
-	init_itoggle('dhcp_static_arp');
-	init_itoggle('dhcp_filter_aaa');
+	PadavanUI.switchControl('dhcp_enable_x');
+	PadavanUI.switchControl('lan_dhcpd_x');
+	PadavanUI.switchControl('dhcp_static_x', change_dhcp_static_enabled);
+	PadavanUI.switchControl('dhcp_static_arp');
+	PadavanUI.switchControl('dhcp_filter_aaa');
 });
 
 </script>

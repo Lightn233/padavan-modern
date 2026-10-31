@@ -22,13 +22,12 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('vpnc_enable', change_vpnc_enabled);
+	PadavanUI.switchControl('vpnc_enable', change_vpnc_enabled);
 
 	$j("#tab_vpnc_cfg, #tab_vpnc_ssl").click(function(){
 		var newHash = $j(this).attr('href').toLowerCase();

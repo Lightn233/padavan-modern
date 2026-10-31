@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 
@@ -31,7 +30,7 @@ var $j = jQuery.noConflict();
 <% dnsforwarder_status(); %>
 
 $j(document).ready(function(){
-	init_itoggle('dns_forwarder_enable');
+	PadavanUI.switchControl('dns_forwarder_enable');
 });
 
 function initial(){

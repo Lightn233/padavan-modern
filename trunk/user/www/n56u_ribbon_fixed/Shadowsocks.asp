@@ -26,7 +26,6 @@
 	<script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 	<script type="text/javascript" src="/general.js"></script>
-	<script type="text/javascript" src="/itoggle.js"></script>
 	<script type="text/javascript" src="/popup.js"></script>
 	<script type="text/javascript" src="/help.js"></script>
 	<script type="text/javascript" src="/validator.js"></script>
@@ -39,16 +38,16 @@
 		editing_ss_id = 0;
 		var $j = jQuery.noConflict();
 		$j(document).ready(function () {
-			init_itoggle('ss_enable');
-			init_itoggle('switch_enable_x_0');
-			init_itoggle('ss_chdns');
-			init_itoggle('ss_router_proxy', change_ss_watchcat_display);
-			init_itoggle('ss_cgroups');
-			init_itoggle('ss_watchcat');
-			init_itoggle('ss_update_chnroute');
-			init_itoggle('ss_update_gfwlist');
-			init_itoggle('socks5_aenable');
-			init_itoggle('ss_schedule_enable', change_on);
+			PadavanUI.switchControl('ss_enable');
+			PadavanUI.switchControl('switch_enable_x_0');
+			PadavanUI.switchControl('ss_chdns');
+			PadavanUI.switchControl('ss_router_proxy', change_ss_watchcat_display);
+			PadavanUI.switchControl('ss_cgroups');
+			PadavanUI.switchControl('ss_watchcat');
+			PadavanUI.switchControl('ss_update_chnroute');
+			PadavanUI.switchControl('ss_update_gfwlist');
+			PadavanUI.switchControl('socks5_aenable');
+			PadavanUI.switchControl('ss_schedule_enable', change_on);
 			$j("#tab_ss_cfg, #tab_ss_add, #tab_ss_dlink, #tab_ss_ssl, #tab_ss_cli, #tab_ss_log, #tab_ss_help").click(
 				function () {
 					var newHash = $j(this).attr('href').toLowerCase();

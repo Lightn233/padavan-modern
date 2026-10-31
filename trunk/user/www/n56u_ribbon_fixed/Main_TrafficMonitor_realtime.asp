@@ -166,114 +166,55 @@ function initial(){
 }
 
 function calc_speed(now_perf){
-	var c, p, h, t, i, j, ifdesc, ifdesc_1st;
-	var x = (new Date()).getTime();
-	var diff_time = (now_perf - last_perf);
-
-	if (diff_time <= 0)
-		diff_time = 1000;
-
-	last_perf = now_perf;
-	x = parseInt(x/1000)*1000;
-
-	ifdesc = null;
-	ifdesc_1st = null;
-
-	for(i in netdevs){
-		c = netdevs[i];
-		p = netdevs_prev[i];
-		h = speed_history[i];
-		if(speed_rx[i] === undefined)
-			speed_rx[i] = prepare_array(x);
-		if(speed_tx[i] === undefined)
-			speed_tx[i] = prepare_array(x);
-		if(h === undefined){
-			speed_history[i] = {};
-			h = speed_history[i];
-			h.rx = [];
-			h.tx = [];
-			h.rx_avg = 0;
-			h.tx_avg = 0;
-			h.rx_max = 0;
-			h.tx_max = 0;
-			for (j = updateAvgLen; j > 0; --j) {
-				h.rx.push(0);
-				h.tx.push(0);
-			}
-		}
-		if(p !== undefined){
-			var diff_rx = 0, diff_tx = 0;
-			
-			if(p.id != c.id) {
-				p.id = c.id;
-				p.rx = 0;
-				p.tx = 0;
-			}
-			
-			if(c.rx < p.rx){
-				if (p.rx <= 0xFFFFFFFF && p.rx > 0xE0000000)
-					diff_rx = (0xFFFFFFFF - p.rx) + c.rx;
-			} else {
-				diff_rx = (c.rx - p.rx);
-			}
-			diff_rx = diff_rx * 1000 / diff_time;
-			
-			h.rx.splice(0, 1);
-			h.rx.push(diff_rx);
-			if (diff_rx > h.rx_max)
-				h.rx_max = diff_rx;
-			
-			t = 0;
-			for (j = (h.rx.length - updateAvgLen); j < h.rx.length; ++j)
-				t += h.rx[j];
-			h.rx_avg = t / updateAvgLen;
-			
-			if(c.tx < p.tx){
-				if (p.tx <= 0xFFFFFFFF && p.tx > 0xE0000000)
-					diff_tx = (0xFFFFFFFF - p.tx) + c.tx;
-			} else {
-				diff_tx = (c.tx - p.tx);
-			}
-			
-			diff_tx = diff_tx * 1000 / diff_time;
-			h.tx.splice(0, 1);
-			h.tx.push(diff_tx);
-			if (diff_tx > h.tx_max)
-				h.tx_max = diff_tx;
-			
-			t = 0;
-			for (j = (h.tx.length - updateAvgLen); j < h.tx.length; ++j)
-				t += h.tx[j];
-			h.tx_avg = t / updateAvgLen;
-			
-			diff_rx = diff_rx*8/1000000;
-			diff_tx = diff_tx*8/1000000;
-			
-			speed_rx[i].push([x, diff_rx]);
-			speed_tx[i].push([x, diff_tx]);
-			
-			if(i === last_netdev){
-				netChart.series[0].addPoint([x, diff_rx], false, false);
-				netChart.series[1].addPoint([x, diff_tx], false, false);
-			}
-		}
-		h.rx_total = c.rx;
-		h.tx_total = c.tx;
-		netdevs_prev[i] = c;
-		if (!ifdesc_1st)
-			ifdesc_1st = i;
-		if (!ifdesc && i === netdev)
-			ifdesc = i;
-	}
-
-	if (!ifdesc && ifdesc_1st){
-		ifdesc = ifdesc_1st;
-		setChartData(ifdesc);
-		E('sel_netif').value = 'speed-tab-' + ifdesc;
-	}
-
-	processTabs();
-	updateTab(speed_history[netdev]);
+    var x = Date.now(), selected = null, first = null;
+    // 不把缺失期间的累计值塞进下一次短采样，也不保留已消失接口的旧选择项。
+    Object.keys(netdevs_prev).forEach(function(name){
+        if (!Object.prototype.hasOwnProperty.call(netdevs, name)) {
+            delete netdevs_prev[name]; delete speed_history[name];
+            delete speed_rx[name]; delete speed_tx[name];
+        }
+    });
+    Object.keys(netdevs).forEach(function(name){
+        var c = netdevs[name], p = netdevs_prev[name], h = speed_history[name];
+        if (!c || !Number.isSafeInteger(c.rx) || !Number.isSafeInteger(c.tx) || c.rx < 0 || c.tx < 0) return;
+        var elapsed = p ? now_perf - p.at : 0;
+        var reset = !p || p.id !== c.id || c.rx < p.rx || c.tx < p.tx || elapsed <= 0 || elapsed > 10000;
+        if (!h || reset) {
+            h = speed_history[name] = {rx:[],tx:[],windowMs:[],rx_avg:0,tx_avg:0,rx_max:0,tx_max:0};
+            speed_rx[name] = []; speed_tx[name] = [];
+        } else {
+            var rx = (c.rx-p.rx)*1000/elapsed, tx = (c.tx-p.tx)*1000/elapsed;
+            h.rx.push(rx); h.tx.push(tx); h.windowMs.push(elapsed);
+            if (h.rx.length > updateAvgLen) { h.rx.shift(); h.tx.shift(); h.windowMs.shift(); }
+            var totalMs = h.windowMs.reduce(function(a,b){return a+b;},0);
+            h.rx_avg = h.rx.reduce(function(a,b,i){return a+b*h.windowMs[i];},0)/totalMs;
+            h.tx_avg = h.tx.reduce(function(a,b,i){return a+b*h.windowMs[i];},0)/totalMs;
+            h.rx_max = Math.max(h.rx_max,rx); h.tx_max = Math.max(h.tx_max,tx);
+            speed_rx[name].push([x,rx*8/1000000]); speed_tx[name].push([x,tx*8/1000000]);
+            // 页面最多保留十五分钟，数组与图表使用同一批真实采样。
+            while (speed_rx[name].length > 451 || (speed_rx[name].length && speed_rx[name][0][0] < x-900000)) {
+                speed_rx[name].shift(); speed_tx[name].shift();
+            }
+        }
+        h.rx_total=c.rx; h.tx_total=c.tx;
+        netdevs_prev[name]={id:c.id,rx:c.rx,tx:c.tx,at:now_perf};
+        if (!first) first=name;
+        if (name===netdev) selected=name;
+    });
+    processTabs();
+    selected=selected||first;
+    if (selected) {
+        setChartData(selected);
+        E('sel_netif').value='speed-tab-'+selected;
+        var upload=trafficReceiveIsUpload(selected);
+        netChart.series[0].setData(prepareData(upload?speed_tx[selected]:speed_rx[selected]),false);
+        netChart.series[1].setData(prepareData(upload?speed_rx[selected]:speed_tx[selected]),false);
+        updateTab(speed_history[selected]);
+    } else {
+        netChart.series[0].setData([],false); netChart.series[1].setData([],false);
+        updateTab({rx:[],tx:[],rx_total:0,tx_total:0});
+    }
+    last_perf=now_perf;
 }
 
 function eval_netdevs(response){
@@ -286,10 +227,8 @@ function eval_netdevs(response){
 }
 
 function prepare_array(x){
-	var data = [], p = -450;
-	for (var i = p; i <= 0; i++)
-		data.push([x+i*2000, 0]);
-	return data;
+    // 尚未采集的数据保持空白，不能预填十五分钟的零流量。
+    return [];
 }
 
 function prepare_array_chart(){
@@ -340,8 +279,8 @@ function setChartData(ifdesc){
 	}
 	if (last_netdev != ifdesc && speed_rx[ifdesc] !== undefined && speed_tx[ifdesc] !== undefined){
 		if (last_netdev != ""){
-			netChart.series[0].setData(prepareData(speed_rx[ifdesc]), false);
-			netChart.series[1].setData(prepareData(speed_tx[ifdesc]), false);
+			netChart.series[0].setData(prepareData(trafficReceiveIsUpload(ifdesc)?speed_tx[ifdesc]:speed_rx[ifdesc]), false);
+			netChart.series[1].setData(prepareData(trafficReceiveIsUpload(ifdesc)?speed_rx[ifdesc]:speed_tx[ifdesc]), false);
 		}
 		last_netdev = ifdesc;
 		setChartTitle(ifdesc);

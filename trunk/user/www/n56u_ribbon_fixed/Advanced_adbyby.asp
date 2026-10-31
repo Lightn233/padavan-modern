@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/client_function.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
@@ -31,15 +30,15 @@
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('adbyby_enable');
-	init_itoggle('hosts_ad');
-	init_itoggle('anti_ad');
-	init_itoggle('block_ios');
-	init_itoggle('block_douyin');
-	init_itoggle('tv_hosts');
-	init_itoggle('adbyby_adb_update');
-	init_itoggle('adbyby_ip_x', change_adbyby_ip_enabled);
-	init_itoggle('adbyby_rules_x', change_adbyby_rules_enabled);
+	PadavanUI.switchControl('adbyby_enable');
+	PadavanUI.switchControl('hosts_ad');
+	PadavanUI.switchControl('anti_ad');
+	PadavanUI.switchControl('block_ios');
+	PadavanUI.switchControl('block_douyin');
+	PadavanUI.switchControl('tv_hosts');
+	PadavanUI.switchControl('adbyby_adb_update');
+	PadavanUI.switchControl('adbyby_ip_x', change_adbyby_ip_enabled);
+	PadavanUI.switchControl('adbyby_rules_x', change_adbyby_rules_enabled);
 	var i=0;
     var z=0;
     var adbyby_update_hour = '<% nvram_get_x("", "adbyby_update_hour"); %>';

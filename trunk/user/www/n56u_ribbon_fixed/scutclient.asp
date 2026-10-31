@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 
@@ -32,11 +31,11 @@ var $j = jQuery.noConflict();
 <% scutclient_version(); %>
 
 $j(document).ready(function(){
-	init_itoggle('scutclient_enable');
-	init_itoggle('scutclient_debug');
-	init_itoggle('scutclient_watchcat');
-	init_itoggle('scutclient_wdg_force');
-	init_itoggle('scutclient_skip_udp_hb');
+	PadavanUI.switchControl('scutclient_enable');
+	PadavanUI.switchControl('scutclient_debug');
+	PadavanUI.switchControl('scutclient_watchcat');
+	PadavanUI.switchControl('scutclient_wdg_force');
+	PadavanUI.switchControl('scutclient_skip_udp_hb');
 	fill_status(scutclient_status());
 });
 

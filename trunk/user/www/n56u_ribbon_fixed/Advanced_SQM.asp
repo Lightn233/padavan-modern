@@ -25,21 +25,20 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 <% sqm_status(); %>
         $j(document).ready(function () {
-            init_itoggle('sqm_enable');
-            init_itoggle('sqm_active');
-            init_itoggle('sqm_down_speed');
-            init_itoggle('sqm_up_speed');
-            init_itoggle('sqm_debug_log');
-            init_itoggle('sqm_log_level');
-            init_itoggle('sqm_qdisc');
-            init_itoggle('sqm_script');
+            PadavanUI.switchControl('sqm_enable');
+            PadavanUI.switchControl('sqm_active');
+            PadavanUI.switchControl('sqm_down_speed');
+            PadavanUI.switchControl('sqm_up_speed');
+            PadavanUI.switchControl('sqm_debug_log');
+            PadavanUI.switchControl('sqm_log_level');
+            PadavanUI.switchControl('sqm_qdisc');
+            PadavanUI.switchControl('sqm_script');
         });
 
         function initial() {

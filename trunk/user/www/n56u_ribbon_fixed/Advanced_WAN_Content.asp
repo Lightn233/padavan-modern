@@ -22,7 +22,6 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 
@@ -30,14 +29,14 @@
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('gw_arp_ping');
-	init_itoggle('x_DHCPClient', change_wan_dhcp_auto);
-	init_itoggle('wan_dnsenable_x', change_wan_dns_auto);
-	init_itoggle('vlan_filter', change_stb_port_and_vlan);
-	init_itoggle('pppoesync_enable');
-	init_itoggle('pppoemwan_enable',change_pppoemwan_enabled);
-	init_itoggle('pppoemwan_rules_x', change_pppoemwan_rules_enabled);
-	init_itoggle('pppoemwan_443');
+	PadavanUI.switchControl('gw_arp_ping');
+	PadavanUI.switchControl('x_DHCPClient', change_wan_dhcp_auto);
+	PadavanUI.switchControl('wan_dnsenable_x', change_wan_dns_auto);
+	PadavanUI.switchControl('vlan_filter', change_stb_port_and_vlan);
+	PadavanUI.switchControl('pppoesync_enable');
+	PadavanUI.switchControl('pppoemwan_enable',change_pppoemwan_enabled);
+	PadavanUI.switchControl('pppoemwan_rules_x', change_pppoemwan_rules_enabled);
+	PadavanUI.switchControl('pppoemwan_443');
 });
 
 </script>

@@ -22,21 +22,20 @@
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('telnetd');
-	init_itoggle('wins_enable', change_wins_enabled);
-	init_itoggle('lltd_enable');
-	init_itoggle('adsc_enable');
-	init_itoggle('crond_enable', change_crond_enabled);
-	init_itoggle('ttyd_enable', change_ttyd_enabled);
-	init_itoggle('vlmcsd_enable');
-	init_itoggle('watchdog_cpu');
+	PadavanUI.switchControl('telnetd');
+	PadavanUI.switchControl('wins_enable', change_wins_enabled);
+	PadavanUI.switchControl('lltd_enable');
+	PadavanUI.switchControl('adsc_enable');
+	PadavanUI.switchControl('crond_enable', change_crond_enabled);
+	PadavanUI.switchControl('ttyd_enable', change_ttyd_enabled);
+	PadavanUI.switchControl('vlmcsd_enable');
+	PadavanUI.switchControl('watchdog_cpu');
 });
 
 </script>

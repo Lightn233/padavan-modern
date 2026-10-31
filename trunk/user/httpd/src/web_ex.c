@@ -3314,6 +3314,8 @@ struct mem_stats {
 	unsigned long free;     // RAM free
 	unsigned long buffers;  // RAM buffers
 	unsigned long cached;   // RAM cached
+	unsigned long available; /* 内核估算的可用内存，与 MemFree 分开。 */
+	int available_known;
 	unsigned long sw_total; // Swap total
 	unsigned long sw_free;  // Swap free
 };
@@ -3348,28 +3350,31 @@ void get_cpudata(struct cpu_stats *st)
 void get_memdata(struct mem_stats *st)
 {
 	FILE *fp;
-	char line_buf[64];
+	char line_buf[128];
 
+	memset(st, 0, sizeof(*st));
 	fp = fopen("/proc/meminfo", "r");
-	if (fp)
-	{
-		if (fgets(line_buf, sizeof(line_buf), fp) && 
-		    sscanf(line_buf, "MemTotal: %lu %*s", &st->total) == 1)
-		{
-			fgets(line_buf, sizeof(line_buf), fp);
-			sscanf(line_buf, "MemFree: %lu %*s", &st->free);
-
-			fgets(line_buf, sizeof(line_buf), fp);	/* skip MemAvailable */
-			
-			fgets(line_buf, sizeof(line_buf), fp);
-			sscanf(line_buf, "Buffers: %lu %*s", &st->buffers);
-			
-			fgets(line_buf, sizeof(line_buf), fp);
-			sscanf(line_buf, "Cached: %lu %*s", &st->cached);
-		}
-		
-		fclose(fp);
+	if (!fp) return;
+	/* 按字段名读取，不能依赖内核版本决定的字段顺序。 */
+	while (fgets(line_buf, sizeof(line_buf), fp)) {
+		char *colon = strchr(line_buf, ':'), *value, *end;
+		unsigned long n;
+		if (!colon) continue;
+		*colon = 0;
+		value = colon + 1;
+		value += strspn(value, " \t");
+		if (!isdigit((unsigned char)*value)) continue;
+		errno = 0;
+		n = strtoul(value, &end, 10);
+		end += strspn(end, " \t");
+		if (errno || strncmp(end, "kB", 2) || strspn(end+2, " \t\r\n") != strlen(end+2)) continue;
+		if (!strcmp(line_buf, "MemTotal")) st->total = n;
+		else if (!strcmp(line_buf, "MemFree")) st->free = n;
+		else if (!strcmp(line_buf, "Buffers")) st->buffers = n;
+		else if (!strcmp(line_buf, "Cached")) st->cached = n;
+		else if (!strcmp(line_buf, "MemAvailable")) { st->available = n; st->available_known = 1; }
 	}
+	fclose(fp);
 }
 
 void get_wifidata(struct wifi_stats *st, int is_5ghz)
@@ -3435,7 +3440,7 @@ static int ej_system_status_hook(int eid, webs_t wp, int argc, char **argv)
 
 	websWrite(wp, "{ \"lavg\": \"%u.%02u %u.%02u %u.%02u\", "
 			"\"uptime\": {\"days\": %lu, \"hours\": %lu, \"minutes\": %lu}, "
-			"\"ram\": {\"total\": %lu, \"used\": %lu, \"free\": %lu, \"buffers\": %lu, \"cached\": %lu}, "
+			"\"ram\": {\"total\": %lu, \"used\": %lu, \"free\": %lu, \"buffers\": %lu, \"cached\": %lu, \"available\": %lu, \"available_known\": %s}, "
 			"\"swap\": {\"total\": %lu, \"used\": %lu, \"free\": %lu}, "
 			"\"cpu\": {\"busy\": %llu, \"user\": %llu, \"nice\": %llu, \"system\": %llu, "
 			      "\"idle\": %llu, \"iowait\": %llu, \"irq\": %llu, \"sirq\": %llu, \"total\": %llu}, "
@@ -3446,7 +3451,8 @@ static int ej_system_status_hook(int eid, webs_t wp, int argc, char **argv)
 			LOAD_INT(info.loads[1]), LOAD_FRAC(info.loads[1]),
 			LOAD_INT(info.loads[2]), LOAD_FRAC(info.loads[2]),
 			updays, uphours, upminutes,
-			mem.total, (mem.total - mem.free), mem.free, mem.buffers, mem.cached,
+			mem.total, (mem.free <= mem.total ? mem.total - mem.free : 0), mem.free, mem.buffers, mem.cached,
+			mem.available, mem.available_known ? "true" : "false",
 			mem.sw_total, (mem.sw_total - mem.sw_free), mem.sw_free,
 			cpu.busy, cpu.user, cpu.nice, cpu.system, cpu.idle, cpu.iowait, cpu.irq, cpu.sirq, cpu.total,
 			wifi2.radio, wifi2.ap_guest,
@@ -4217,6 +4223,7 @@ static char mentohust_log_txt[] =
 
 #if defined(APP_ADGUARDHOME)
 #include "adguardhome_backup_http.h"
+#include "adguardhome_status_http.h"
 #endif
 
 #if defined(APP_DDNS_GO)
@@ -4231,6 +4238,7 @@ struct mime_handler mime_handlers[] = {
 #endif
 #if defined(APP_ADGUARDHOME)
     { "adguardhome_backup.asp", "application/json", no_cache_IE, do_agh_backup_post, do_agh_backup, 1 },
+    { "adguardhome_status.json*", "application/json", no_cache_IE, NULL, do_agh_status, 1 },
 #endif
 	/* cached javascript files w/o translations */
 	{ "jquery.js", "text/javascript", NULL, NULL, do_file, 0 }, // 2012.06 Eagle23

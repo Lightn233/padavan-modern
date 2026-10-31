@@ -23,15 +23,14 @@
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/help.js"></script>
 <script type="text/javascript" src="/general.js"></script>
-<script type="text/javascript" src="/itoggle.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
 <script type="text/javascript" src="/client_function.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
 $j(document).ready(function() {
-	init_itoggle('upnp_enable_x', change_upnp_enabled);
-	init_itoggle('vts_enable_x', change_vts_enabled);
+	PadavanUI.switchControl('upnp_enable_x', change_upnp_enabled);
+	PadavanUI.switchControl('vts_enable_x', change_vts_enabled);
 });
 
 </script>
