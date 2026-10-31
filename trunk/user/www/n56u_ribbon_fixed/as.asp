@@ -135,7 +135,7 @@ function show_sitemap(){
                                         <tr>
                                             <!--=====Beginning of Main Content=====-->
                                             <td style="border-top: 0 none;">
-                                                <table id="menu_body" width="100%" border="0" align="center" cellpadding="3" cellspacing="1" bgcolor="#CCCCCC" class="sitemap">
+                                                <table id="menu_body" width="100%" border="0" align="center" cellpadding="3" cellspacing="1" class="sitemap">
                                                     <tr>
                                                         <td width="25%">&nbsp;</td>
                                                         <td width="25%">&nbsp;</td>
