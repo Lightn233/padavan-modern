@@ -3408,11 +3408,11 @@ void get_wifidata(struct wifi_stats *st, int is_5ghz)
 
 static int ej_system_status_hook(int eid, webs_t wp, int argc, char **argv)
 {
-	struct sysinfo info;
-	struct cpu_stats cpu;
-	struct mem_stats mem;
-	struct wifi_stats wifi2;
-	struct wifi_stats wifi5;
+	struct sysinfo info = {0};
+	struct cpu_stats cpu = {0};
+	struct mem_stats mem = {0};
+	struct wifi_stats wifi2 = {0};
+	struct wifi_stats wifi5 = {0};
 	struct stat log;
 	unsigned long updays, uphours, upminutes;
 
@@ -3433,15 +3433,15 @@ static int ej_system_status_hook(int eid, webs_t wp, int argc, char **argv)
 	if (stat("/tmp/syslog.log", &log) != 0)
 		log.st_mtime = 0;
 
-	websWrite(wp, "{ lavg: \"%u.%02u %u.%02u %u.%02u\", "
-			"uptime: {days: %lu, hours: %lu, minutes: %lu}, "
-			"ram: {total: %lu, used: %lu, free: %lu, buffers: %lu, cached: %lu}, "
-			"swap: {total: %lu, used: %lu, free: %lu}, "
-			"cpu: {busy: 0x%llx, user: 0x%llx, nice: 0x%llx, system: 0x%llx, "
-			      "idle: 0x%llx, iowait: 0x%llx, irq: 0x%llx, sirq: 0x%llx, total: 0x%llx}, "
-			"wifi2: {state: %d, guest: %d}, "
-			"wifi5: {state: %d, guest: %d}, "
-			"logmt: %lld }",
+	websWrite(wp, "{ \"lavg\": \"%u.%02u %u.%02u %u.%02u\", "
+			"\"uptime\": {\"days\": %lu, \"hours\": %lu, \"minutes\": %lu}, "
+			"\"ram\": {\"total\": %lu, \"used\": %lu, \"free\": %lu, \"buffers\": %lu, \"cached\": %lu}, "
+			"\"swap\": {\"total\": %lu, \"used\": %lu, \"free\": %lu}, "
+			"\"cpu\": {\"busy\": %llu, \"user\": %llu, \"nice\": %llu, \"system\": %llu, "
+			      "\"idle\": %llu, \"iowait\": %llu, \"irq\": %llu, \"sirq\": %llu, \"total\": %llu}, "
+			"\"wifi2\": {\"state\": %d, \"guest\": %d}, "
+			"\"wifi5\": {\"state\": %d, \"guest\": %d}, "
+			"\"logmt\": %lld }",
 			LOAD_INT(info.loads[0]), LOAD_FRAC(info.loads[0]),
 			LOAD_INT(info.loads[1]), LOAD_FRAC(info.loads[1]),
 			LOAD_INT(info.loads[2]), LOAD_FRAC(info.loads[2]),

@@ -34,6 +34,9 @@ with tempfile.TemporaryDirectory(prefix='padavan-webui-') as tmp:
     urllib.request.urlopen('http://127.0.0.1:8767/lab/results',timeout=.2).close();break
    except OSError:time.sleep(.1)
   args.report.mkdir(parents=True,exist_ok=True)
+  # 直接编译源码中的状态序列化函数，避免模拟服务器掩盖真实接口格式问题。
+  status=subprocess.run(['python3',str(P/'test-status-json.py'),'--source',str(REPO/'trunk/user/httpd/src/web_ex.c'),'--baseline',str(R/'baseline/trunk/user/httpd/src/web_ex.c'),'--report',str(args.report/'status-json-native.json')],capture_output=True,text=True,timeout=60)
+  (args.report/'status-json-native.log').write_text(status.stdout+status.stderr);failed|=status.returncode!=0
   for name in ['test_controller.cjs','test-dom.cjs','test-functional.cjs']:
    result=subprocess.run(['node',str(R/name)],cwd=R,capture_output=True,text=True,timeout=240)
    (args.report/(name+'.log')).write_text(result.stdout+result.stderr);failed|=result.returncode!=0
