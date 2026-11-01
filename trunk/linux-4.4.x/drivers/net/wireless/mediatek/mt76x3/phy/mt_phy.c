@@ -16,6 +16,7 @@
 
 
 #include "rt_config.h"
+#include <linux/math64.h>
 static INT32 MTBbpInit(RTMP_ADAPTER *pAd)
 {
 	DBGPRINT(RT_DEBUG_TRACE, ("%s(): Init BBP Registers\n", __FUNCTION__));
@@ -81,10 +82,15 @@ INT MTSmartCarrierSense(RTMP_ADAPTER *pAd)
 {
 	UINT16 RxRatio=0;
 	UCHAR idx = 0, RtsEnable = 0, Action = Keep_Range;
-	UINT32 CrValue = 0, MaxRtsRtyCount = 0, MaxRtsCount = 0, TempValue = 0, tmpCrValue=0, TotalTp=0;
+	UINT32 CrValue = 0, MaxRtsRtyCount = 0, MaxRtsCount = 0, TempValue = 0, tmpCrValue=0;
+	UINT32 RxBytes = pAd->RalinkCounters.OneSecReceivedByteCount;
+	UINT32 TxBytes = pAd->RalinkCounters.OneSecTransmittedByteCount;
+	UINT64 TotalTp = (UINT64)RxBytes + TxBytes;
 	INT32	AdjustStep=0;
 	CHAR	RSSIBoundary = 0;
-		RxRatio = ((pAd->RalinkCounters.OneSecReceivedByteCount) * 100 / (pAd->RalinkCounters.OneSecReceivedByteCount + pAd->RalinkCounters.OneSecTransmittedByteCount));
+	/* Snapshot both counters once; idle traffic must reach the normal reset
+	 * path, and byte counters must not overflow when converted to percent. */
+	RxRatio = TotalTp ? div64_u64((UINT64)RxBytes * 100, TotalTp) : 0;
 	//DBGPRINT(RT_DEBUG_ERROR, ("%s():Enter ---> BssNr=%d, miniRSSI=%d, TotalByteCount=%d RxByteCount=%d TxByteCount=%d EDCCA=%d RxRatio=%d\n", __FUNCTION__,
 	//	pAd->SCSCtrl.SCSBssTab.BssNr, pAd->SCSCtrl.SCSMinRssi, (pAd->RalinkCounters.OneSecReceivedByteCount + pAd->RalinkCounters.OneSecTransmittedByteCount), 
 	//	pAd->RalinkCounters.OneSecReceivedByteCount, pAd->RalinkCounters.OneSecTransmittedByteCount,
@@ -109,7 +115,6 @@ INT MTSmartCarrierSense(RTMP_ADAPTER *pAd)
 	RSSIBoundary = pAd->SCSCtrl.SCSMinRssi - pAd->SCSCtrl.SCSMinRssiTolerance;
 	RSSIBoundary -= (RSSIBoundary % 2);
 	pAd->SCSCtrl.RSSIBoundary = min (RSSIBoundary, pAd->SCSCtrl.FixedRssiBond);
-	TotalTp = pAd->RalinkCounters.OneSecReceivedByteCount + pAd->RalinkCounters.OneSecTransmittedByteCount;
 	
 	if ((((pAd->SCSCtrl.ForceMode == 1) && (TotalTp > pAd->SCSCtrl.SCSTrafficThreshold)) || (RtsEnable ==1)) 
 		&& ((pAd->MacTab.Size > 0) && (pAd->SCSCtrl.SCSMinRssi < 0) && (RxRatio < 90)))
