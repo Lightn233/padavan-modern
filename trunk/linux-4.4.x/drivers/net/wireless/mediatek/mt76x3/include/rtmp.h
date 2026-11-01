@@ -1445,6 +1445,7 @@ struct reordering_mpdu {
 	struct reordering_mpdu *next;
 	PNDIS_PACKET pPacket;	/* coverted to 802.3 frame */
 	int Sequence;		/* sequence number of MPDU */
+	ULONG rx_time;		/* arrival time; bounds waiting across sequence holes */
 	BOOLEAN bAMSDU;
 	UCHAR					OpMode;
 };

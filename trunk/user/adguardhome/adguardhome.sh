@@ -235,6 +235,28 @@ finish_start()
     fi
 }
 
+# dnsproxy in the official AGH binary loses the incoming IPv6 interface index.
+# A global/ULA client querying a link-local UDP socket then cannot get a reply.
+# Keep the client address and use a non-link-local address on the same LAN for
+# the local service leg; conntrack restores the exact address the client queried.
+set_adg_ipv6_scope_rule()
+{
+    local service_address link_address link_addresses
+    service_address=$(ip -6 addr show dev br0 scope global | awk '
+      /inet6 / && !/ tentative/ && !/ deprecated/ && !/ dadfailed/ {
+        sub(/\/.*/, "", $2); print $2; exit
+      }')
+    [ -n "$service_address" ] || return 0
+    link_addresses=$(ip -6 addr show dev br0 scope link | awk '
+      /inet6 / && !/ tentative/ && !/ dadfailed/ {
+        sub(/\/.*/, "", $2); print $2
+      }')
+    for link_address in $link_addresses; do
+        ip6tables -t nat -A ADGHOME ! -s fe80::/10 -d "$link_address" \
+            -p udp --dport 5335 -j DNAT --to-destination "[$service_address]:5335" || return 1
+    done
+}
+
 set_adg_rules()
 {
     mode=$(nvram get adg_redirect)
@@ -242,6 +264,9 @@ set_adg_rules()
     case "$mode" in 2|3) ;; *) return 0 ;; esac
     for tool in iptables ip6tables; do
         $tool -t nat -N ADGHOME 2>/dev/null || continue
+        if [ "$tool" = ip6tables ]; then
+            set_adg_ipv6_scope_rule || return 1
+        fi
         if [ "$mode" = 3 ]; then
             for proto in tcp udp; do
                 $tool -t nat -A ADGHOME -p "$proto" --dport 53 -j REDIRECT --to-ports 5335 || return 1

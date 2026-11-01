@@ -400,63 +400,37 @@ static void ba_refresh_reordering_mpdus(RTMP_ADAPTER *pAd, BA_REC_ENTRY *pBAEntr
 
 /* static */
 void ba_flush_reordering_timeout_mpdus(
-									IN PRTMP_ADAPTER    pAd, 
-									IN PBA_REC_ENTRY    pBAEntry,
-									IN ULONG            Now32)
-
+    IN PRTMP_ADAPTER pAd,
+    IN PBA_REC_ENTRY pBAEntry,
+    IN ULONG Now32)
 {
-	USHORT Sequence;
+    struct reordering_mpdu *mpdu_blk;
+    ULONG timeout = REORDERING_PACKET_TIMEOUT;
 
-    if ((pBAEntry == NULL) || (pBAEntry->list.qlen <= 0))
+    if (pBAEntry == NULL)
         return;
-
-/*	if ((RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+REORDERING_PACKET_TIMEOUT)) &&*/
-/*		 (pBAEntry->list.qlen > ((pBAEntry->BAWinSize*7)/8))) ||*/
-/*		(RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(10*REORDERING_PACKET_TIMEOUT))) &&*/
-/*		 (pBAEntry->list.qlen > (pBAEntry->BAWinSize/8)))*/
-	if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(MAX_REORDERING_PACKET_TIMEOUT/6))) 
-		 &&(pBAEntry->list.qlen > 0/*1*/)
-		)
-	{
-		DBGPRINT(RT_DEBUG_TRACE,("timeout[%d] (%08lx-%08lx = %d > %d): %x, flush all!\n ", pBAEntry->list.qlen, Now32, (pBAEntry->LastIndSeqAtTimer), 
-			   (int)((long) Now32 - (long)(pBAEntry->LastIndSeqAtTimer)), MAX_REORDERING_PACKET_TIMEOUT,
-			   pBAEntry->LastIndSeq));
-		ba_refresh_reordering_mpdus(pAd, pBAEntry);
-		pBAEntry->LastIndSeqAtTimer = Now32;
-	}
-	else
-#ifdef CONFIG_BA_REORDER_MONITOR		
-	if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(pAd->BATable.ba_reordering_packet_timeout)))
-		&& (pBAEntry->list.qlen > 0)
-	   )
-#else
-	if (RTMP_TIME_AFTER((unsigned long)Now32, (unsigned long)(pBAEntry->LastIndSeqAtTimer+(REORDERING_PACKET_TIMEOUT)))
-		&& (pBAEntry->list.qlen > 0)
-	   )
+#ifdef CONFIG_BA_REORDER_MONITOR
+    timeout = pAd->BATable.ba_reordering_packet_timeout;
 #endif
-		{
-/*
-		DBGPRINT(RT_DEBUG_OFF, ("timeout[%d] (%lx-%lx = %d > %d): %x, ", pBAEntry->list.qlen, Now32, (pBAEntry->LastIndSeqAtTimer),
-			   (int)((long) Now32 - (long)(pBAEntry->LastIndSeqAtTimer)), REORDERING_PACKET_TIMEOUT,
-			   pBAEntry->LastIndSeq));
-*/
-    		
-		/* force LastIndSeq to shift to LastIndSeq+1*/
-    		Sequence = (pBAEntry->LastIndSeq+1) & MAXSEQ;
-    		ba_indicate_reordering_mpdus_le_seq(pAd, pBAEntry, Sequence);
-    		pBAEntry->LastIndSeqAtTimer = Now32;
-			pBAEntry->LastIndSeq = Sequence;
-    		
-    		/* indicate in-order mpdus*/
-    		Sequence = ba_indicate_reordering_mpdus_in_order(pAd, pBAEntry, Sequence);
-    		if (Sequence != RESET_RCV_SEQ)
-    		{
-    			pBAEntry->LastIndSeq = Sequence;
-    		}
-
-		DBGPRINT(RT_DEBUG_TRACE, ("%x, flush one!\n", pBAEntry->LastIndSeq));
-
-	}
+    NdisAcquireSpinLock(&pBAEntry->RxReRingLock);
+    while ((mpdu_blk = ba_reordering_mpdu_probe(&pBAEntry->list))) {
+        /* Age the buffered frame, not each missing sequence number.  Advancing
+         * one hole and restarting the timer made consecutive losses multiply
+         * the receive delay.  Keep the existing retry grace period, then skip
+         * directly to the expired frame; contiguous frames can follow it. */
+        if (!SEQ_STEPONE(mpdu_blk->Sequence, pBAEntry->LastIndSeq, MAXSEQ) &&
+            !RTMP_TIME_AFTER((unsigned long)Now32,
+                (unsigned long)(mpdu_blk->rx_time + timeout)))
+            break;
+        mpdu_blk = ba_reordering_mpdu_dequeue(&pBAEntry->list);
+        if (mpdu_blk == NULL)
+            break;
+        pBAEntry->LastIndSeq = mpdu_blk->Sequence;
+        pBAEntry->LastIndSeqAtTimer = Now32;
+        ANNOUNCE_REORDERING_PACKET(pAd, mpdu_blk);
+        ba_mpdu_blk_free(pAd, mpdu_blk);
+    }
+    NdisReleaseSpinLock(&pBAEntry->RxReRingLock);
 }
 
 
@@ -1674,6 +1648,7 @@ static VOID ba_enqueue_reordering_packet(
 		NdisAcquireSpinLock(&pBAEntry->RxReRingLock);
 
 		mpdu_blk->Sequence = Sequence;
+		NdisGetSystemUpTime(&mpdu_blk->rx_time);
 		mpdu_blk->OpMode = pRxBlk->OpMode;
 
 		mpdu_blk->bAMSDU = RX_BLK_TEST_FLAG(pRxBlk, fRX_AMSDU);
@@ -1841,14 +1816,16 @@ void ba_timeout_monitor(PRTMP_ADAPTER pAd)
 		for (idx = 0; idx < MAX_LEN_OF_BA_REC_TABLE; idx++) {
 			pBAEntry = &pAd->BATable.BARecEntry[idx];
 		
-			if ((pBAEntry->REC_BA_Status == Recipient_Accept) 
-					&& (pBAEntry->list.qlen > 0)) {
-
-				if (RTMP_TIME_AFTER((unsigned long)now, 
-					(unsigned long)(pBAEntry->LastIndSeqAtTimer + pAd->BATable.ba_reordering_packet_timeout ))) {
-					need_check = TRUE;	
-					pAd->BATable.ba_timeout_bitmap[(idx >> 5)] |= (1 << (idx % 32));
+			if (pBAEntry->REC_BA_Status == Recipient_Accept) {
+				struct reordering_mpdu *head;
+				NdisAcquireSpinLock(&pBAEntry->RxReRingLock);
+				head = ba_reordering_mpdu_probe(&pBAEntry->list);
+				if (head && RTMP_TIME_AFTER((unsigned long)now,
+					(unsigned long)(head->rx_time + pAd->BATable.ba_reordering_packet_timeout))) {
+					need_check = TRUE;
+					pAd->BATable.ba_timeout_bitmap[(idx >> 5)] |= (1U << (idx % 32));
 				}
+				NdisReleaseSpinLock(&pBAEntry->RxReRingLock);
 			}
 		}
 

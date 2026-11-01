@@ -82,9 +82,10 @@ maintain_network()
         /usr/bin/adguardhome.sh start >/dev/null 2>&1 || return 1
     fi
 
-    # 即使保存的 /64 前缀未变，IPv6 地址也可能在 AGH 启动后才出现。
+    # Include address flags: tentative -> usable or deprecated must rebuild
+    # the local DNS target even when the address/prefix text stays unchanged.
     address_key=$(ip addr show dev br0 2>/dev/null |
-        awk '$1=="inet" || $1=="inet6" {print $1" "$2}' |
+        awk '$1=="inet" || $1=="inet6" {sub(/^[[:space:]]+/, ""); print}' |
         sort | md5sum | cut -d' ' -f1)
     if [ "$address_key" != "$previous_addresses" ]; then
         if /usr/bin/adguardhome.sh rules >/dev/null 2>&1; then

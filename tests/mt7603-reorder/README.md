@@ -1,0 +1,1 @@
+Run `python3 tests/mt7603-reorder/test-reorder.py` from a Linux checkout with a C compiler and ASan/UBSan. The harness extracts the production timeout function and covers queued-frame age, several sequence holes, contiguous delivery, fresh frames, sequence wrap, 32-bit clock wrap, and configured multi-client timeouts. It does not change hardware or replace radio acceptance.
