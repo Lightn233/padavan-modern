@@ -51,7 +51,7 @@ var net_chart_rt = {
     },
     xAxis: {
         type: 'datetime',
-        minRange: 10*1000,
+        minRange: 2*1000,
         title: {
             text: null
         },

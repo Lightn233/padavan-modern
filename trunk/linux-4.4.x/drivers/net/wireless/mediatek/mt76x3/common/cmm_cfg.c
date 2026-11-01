@@ -2202,6 +2202,9 @@ INT SetSCSEnable_Proc(RTMP_ADAPTER *pAd, RTMP_STRING *arg)
 		RTMP_IO_WRITE32(pAd, CR_AGC_3, pAd->SCSCtrl.CR_AGC_3_default);
 		RTMP_IO_WRITE32(pAd, CR_AGC_3_RX1, pAd->SCSCtrl.CR_AGC_3_default);
 		pAd->SCSCtrl.SCSStatus = SCS_STATUS_DEFAULT;
+		/* Match the restored hardware before SCS is enabled again. */
+		pAd->SCSCtrl.CurrSensitivity = -102;
+		pAd->SCSCtrl.AdjustSensitivity = -102;
 	}
 	else
 		DBGPRINT(RT_DEBUG_OFF, ("==>%s (Unknow value = %d)\n", __FUNCTION__, value));

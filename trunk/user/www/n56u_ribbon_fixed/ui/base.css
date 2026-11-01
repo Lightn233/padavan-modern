@@ -128,3 +128,5 @@ input[type=text][maxlength="2"][size="2"]{min-width:3.5em;padding:7px 6px;text-a
 .ui-chart .ui-chart-timeline input[type=range]{grid-column:1/-1;width:100%;min-width:0;min-height:24px;margin:0;padding:0;border:0;box-shadow:none;background:transparent}
 .ui-chart-timeline input:disabled{opacity:.45}
 @media(max-width:620px){.traffic-summary{grid-template-columns:1fr;gap:12px}.traffic-card{padding:18px}.traffic-rate{font-size:28px}.ui-chart .ui-chart-timeline{grid-template-columns:1fr;gap:14px}.traffic-details{gap:8px}.traffic-details dd{font-size:12px}}
+
+.ui-chart-range-hint{flex-basis:100%;font-size:12px;color:var(--muted);line-height:1.5;padding-bottom:2px}
