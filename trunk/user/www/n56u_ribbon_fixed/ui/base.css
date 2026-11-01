@@ -105,3 +105,26 @@ input[type=text][maxlength="2"][size="2"]{min-width:3.5em;padding:7px 6px;text-a
 .ui-network-map .ui-map-status:before{content:"";display:block;width:7px;height:7px;flex:none;background:currentColor;border-radius:50%}
 .ui-network-map .ui-map-chevron{font-size:24px;color:var(--map-color);opacity:.6;margin-left:auto}
 @media(max-width:799px){.ui-network-map tr[data-state]{min-width:min(220px,100%)}.ui-network-map .ui-map-card{min-height:88px;padding:14px!important}.ui-network-map .ui-map-status{font-size:15px}}
+
+/* Traffic summaries share the chart's upload/download colors and stable IDs. */
+.traffic-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0 6px}
+.traffic-card{min-width:0;padding:22px;border:1px solid #dce5ef;border-radius:14px;background:#fff;color:#263c57}
+.traffic-card-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.traffic-card-head h3{margin:0;font-size:15px;font-weight:650;line-height:1.4}
+.traffic-card-head p{margin:3px 0 0;color:#728198;font-size:12px;line-height:1.5}
+.traffic-direction{display:flex;align-items:center;justify-content:center;flex:none;width:42px;height:42px;border-radius:12px;background:#edf3ff;color:#003eba}
+.traffic-download .traffic-direction{background:#fff4e4;color:#b86800}
+.traffic-direction svg{width:23px;height:23px}
+.traffic-swatch{width:8px;height:8px;border-radius:50%;margin-left:auto;flex:none}
+.traffic-rate-label{display:block;font-size:12px;color:#728198;margin-bottom:4px}
+.traffic-rate{display:block;font-size:clamp(23px,2.4vw,32px);font-weight:650;line-height:1.4;letter-spacing:-.6px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.traffic-details{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0 0;padding-top:16px;border-top:1px solid #edf1f6}
+.traffic-details div{min-width:0}.traffic-details dt{font-size:11px;font-weight:400;color:#728198;margin:0 0 5px}.traffic-details dd{font-size:13px;font-weight:600;margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ui-chart-range-summary{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:14px 16px 0;background:#f5f8fc;border:1px solid #e5ebf3;border-bottom:0;border-radius:10px 10px 0 0}
+.ui-chart-range-summary strong{color:#344b67;font-size:12px}.ui-chart-range-summary output{font-size:12px;color:#526b87;font-variant-numeric:tabular-nums}
+.ui-chart .ui-chart-timeline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:12px 16px 14px;margin:0;background:#f5f8fc;border:1px solid #e5ebf3;border-top:0;border-radius:0 0 10px 10px;box-sizing:border-box}
+.ui-chart .ui-chart-timeline label{display:grid;grid-template-columns:1fr auto;gap:7px 10px;min-width:0;margin:0;font-size:12px;white-space:nowrap}
+.ui-chart-timeline output{font-variant-numeric:tabular-nums;color:#344b67;font-weight:600}
+.ui-chart .ui-chart-timeline input[type=range]{grid-column:1/-1;width:100%;min-width:0;min-height:24px;margin:0;padding:0;border:0;box-shadow:none;background:transparent}
+.ui-chart-timeline input:disabled{opacity:.45}
+@media(max-width:620px){.traffic-summary{grid-template-columns:1fr;gap:12px}.traffic-card{padding:18px}.traffic-rate{font-size:28px}.ui-chart .ui-chart-timeline{grid-template-columns:1fr;gap:14px}.traffic-details{gap:8px}.traffic-details dd{font-size:12px}}

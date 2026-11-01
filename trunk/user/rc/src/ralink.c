@@ -829,6 +829,12 @@ gen_ralink_config(int is_soc_ap, int is_aband, int disable_autoscan)
 	//AutoChannelSkipList
 	if (!is_aband)
 		sprintf(list, "%d", 14);
+#if defined(BOARD_WIFI5_POLICY) && defined(USE_WID_5G) && (USE_WID_5G == 7615)
+	else if (i_channel == 0 && wifi5_bw == 160)
+		/* Any excluded subchannel removes its whole 160 MHz group in ACS.
+		 * Channel 0 is a neutral list entry; regulatory/DFS checks still apply. */
+		sprintf(list, "%d", 0);
+#endif
 	else
 		sprintf(list, "%d;%d;%d;%d", 52, 56, 60, 64);
 	fprintf(fp, "AutoChannelSkipList=%s\n", list);

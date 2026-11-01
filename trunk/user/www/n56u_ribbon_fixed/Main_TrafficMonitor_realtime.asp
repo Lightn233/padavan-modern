@@ -381,42 +381,24 @@ function switchPage(id){
                                         <table style="width: 100%; margin-top: 6px; margin-bottom: 6px;">
                                             <tr>
                                                 <td width="100%" align="center" style="text-align: center">
-                                                    <div id="net_chart" style="width: 850px; padding-left: 5px;"></div>
+                                                    <div id="net_chart" style="width: 100%; min-width: 0;"></div>
                                                 </td>
                                             </tr>
                                         </table>
                                     </center>
 
-                                    <table width="100%" align="center" cellpadding="4" cellspacing="0" class="table table-stat">
-                                        <tr>
-                                            <th width="9%"><#Color#></th>
-                                            <th width="11%"><#Network#></th>
-                                            <th width="20%" style="text-align: right"><#Current#></th>
-                                            <th width="20%" style="text-align: right"><#Average#></th>
-                                            <th width="20%" style="text-align: right"><#Maximum#></th>
-                                            <th width="20%" style="text-align: right"><#Total#></th>
-                                        </tr>
-                                        <tr>
-                                            <td width="9%" style="text-align:center; vertical-align: middle;">
-                                                <div id="rx-sel" class="span12" style="border-radius: 5px;"></div>
-                                            </td>
-                                            <td width="11%"><#Downlink#></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right;font-weight: bold;"><span id="rx-current"></span></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id="rx-avg"></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id="rx-max"></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id="rx-total"></td>
-                                        </tr>
-                                        <tr>
-                                            <td width="9%" style="text-align:center; vertical-align: middle;">
-                                                <div id="tx-sel" class="span12" style="border-radius: 5px;"></div>
-                                            </td>
-                                            <td width="11%"><#Uplink#></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right;font-weight: bold;"><span id="tx-current"></span></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id='tx-avg'></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id='tx-max'></td>
-                                            <td width="20%" align="center" valign="top" style="text-align:right" id='tx-total'></td>
-                                        </tr>
-                                    </table>
+                                    <div class="traffic-summary">
+<section class="traffic-card traffic-upload" aria-label="<#Uplink#>">
+ <div class="traffic-card-head"><span class="traffic-direction" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></span><div><h3><#Uplink#></h3><p>发送数据</p></div><span id="tx-sel" class="traffic-swatch" aria-hidden="true"></span></div>
+ <span class="traffic-rate-label"><#Current#></span><strong class="traffic-rate" id="tx-current">—</strong>
+ <dl class="traffic-details"><div><dt><#Average#></dt><dd id="tx-avg">—</dd></div><div><dt><#Maximum#></dt><dd id="tx-max">—</dd></div><div><dt><#Total#></dt><dd id="tx-total">—</dd></div></dl>
+</section>
+<section class="traffic-card traffic-download" aria-label="<#Downlink#>">
+ <div class="traffic-card-head"><span class="traffic-direction" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-6-6 6 6 6-6"/></svg></span><div><h3><#Downlink#></h3><p>接收数据</p></div><span id="rx-sel" class="traffic-swatch" aria-hidden="true"></span></div>
+ <span class="traffic-rate-label"><#Current#></span><strong class="traffic-rate" id="rx-current">—</strong>
+ <dl class="traffic-details"><div><dt><#Average#></dt><dd id="rx-avg">—</dd></div><div><dt><#Maximum#></dt><dd id="rx-max">—</dd></div><div><dt><#Total#></dt><dd id="rx-total">—</dd></div></dl>
+</section>
+</div>
 
                                 </div>
                             </div>
