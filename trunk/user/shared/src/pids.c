@@ -90,7 +90,8 @@ static int read_to_buf(const char *filename, void *buf)
 void* xzalloc(size_t size)
 {
         void *ptr = malloc(size);
-        memset(ptr, 0, size);
+        if (ptr)
+                memset(ptr, 0, size);
         return ptr;
 }
 
@@ -125,7 +126,15 @@ static procps_status_t* alloc_procps_scan(void)
 {
 	unsigned n = getpagesize();
 	procps_status_t* sp = xzalloc(sizeof(procps_status_t));
+	if (!sp)
+		return NULL;
 	sp->dir = opendir("/proc");
+	if (!sp->dir) {
+		int saved_errno = errno;
+		free(sp);
+		errno = saved_errno;
+		return NULL;
+	}
 	while (1) {
 		n >>= 1;
 		if (!n) break;
@@ -193,8 +202,11 @@ unsigned long long bb_strtoull(const char *arg, char **endp, int base)
 void* xrealloc(void *ptr, size_t size)
 {
         ptr = realloc(ptr, size);
-        if (ptr == NULL && size != 0)
+        if (ptr == NULL && size != 0) {
+                int saved_errno = errno;
                 perror("no memory");
+                errno = saved_errno;
+        }
         return ptr;
 }
 
@@ -205,7 +217,8 @@ void* xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift, int idx)
         if (!(idx & (mask - 1))) {
                 sizeof_and_shift >>= 8; /* sizeof(vector[0]) */
                 vector = xrealloc(vector, sizeof_and_shift * (idx + mask + 1));
-                memset((char*)vector + (sizeof_and_shift * idx), 0, sizeof_and_shift * (mask + 1));
+                if (vector)
+                        memset((char*)vector + (sizeof_and_shift * idx), 0, sizeof_and_shift * (mask + 1));
         }
         return vector;
 }
@@ -215,9 +228,14 @@ void* xrealloc_vector_helper(void *vector, unsigned sizeof_and_shift, int idx)
 
 void free_procps_scan(procps_status_t* sp)
 {
-	closedir(sp->dir);
-	free(sp->argv0);
-	free(sp);
+	int saved_errno = errno;
+	if (sp) {
+		if (sp->dir)
+			closedir(sp->dir);
+		free(sp->argv0);
+		free(sp);
+	}
+	errno = saved_errno;
 }
 
 procps_status_t* procps_scan(procps_status_t* sp, int flags)
@@ -231,10 +249,14 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
 	int n;
 	struct stat sb;
 
-	if (!sp)
+	if (!sp) {
 		sp = alloc_procps_scan();
+		if (!sp)
+			return NULL;
+	}
 
 	for (;;) {
+		errno = 0;
 		entry = readdir(sp->dir);
 		if (entry == NULL) {
 			free_procps_scan(sp);
@@ -250,6 +272,11 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
 
 		memset(&sp->vsz, 0, sizeof(*sp) - offsetof(procps_status_t, vsz));
 
+		/* A process may exit before stat/cmdline can be read. Never reuse
+		 * argv from the previous process for this new PID. */
+		free(sp->argv0);
+		sp->argv0 = NULL;
+		sp->argv_len = 0;
 		sp->pid = pid;
 		if (!(flags & ~PSSCAN_PID)) break;
 
@@ -274,14 +301,15 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
 			if (n < 0)
 				break;
 			cp = strrchr(buf, ')'); /* split into "PID (cmd" and "<rest>" */
-			/*if (!cp || cp[1] != ' ')
-				break;*/
+			if (!cp || cp[1] != ' ')
+				break;
 			cp[0] = '\0';
 			if (sizeof(sp->comm) < 16)
 				BUG_comm_size();
 			comm1 = strchr(buf, '(');
-			/*if (comm1)*/
-				strncpy(sp->comm, comm1 + 1, sizeof(sp->comm));
+			if (!comm1 || comm1 >= cp)
+				break;
+			strncpy(sp->comm, comm1 + 1, sizeof(sp->comm) - 1);
 
 			n = sscanf(cp+2,
 				"%c %u "               /* state, ppid */
@@ -328,8 +356,7 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
 		}
 
 		if (flags & (PSSCAN_ARGV0|PSSCAN_ARGVN)) {
-			free(sp->argv0);
-			sp->argv0 = NULL;
+
 			strcpy(filename_tail, "/cmdline");
 			n = read_to_buf(filename, buf);
 			if (n <= 0)
@@ -337,11 +364,19 @@ procps_status_t* procps_scan(procps_status_t* sp, int flags)
 			if (flags & PSSCAN_ARGVN) {
 				sp->argv_len = n;
 				sp->argv0 = malloc(n + 1);
+				if (!sp->argv0) {
+					free_procps_scan(sp);
+					return NULL;
+				}
 				memcpy(sp->argv0, buf, n + 1);
 				/* sp->argv0[n] = '\0'; - buf has it */
 			} else {
 				sp->argv_len = 0;
 				sp->argv0 = strdup(buf);
+				if (!sp->argv0) {
+					free_procps_scan(sp);
+					return NULL;
+				}
 			}
 		}
 		break;
@@ -393,7 +428,7 @@ static int comm_match(procps_status_t *p, const char *procName)
  *  Currently, it's implemented by rummaging through
  *  the proc filesystem.
  *
- *  Returns a list of all matching PIDs
+ *  Returns a list of all matching PIDs, or NULL on a scan/allocation error.
  *  It is the caller's duty to free the returned pidlist.
  */
 pid_t* find_pid_by_name(const char *procName)
@@ -403,6 +438,8 @@ pid_t* find_pid_by_name(const char *procName)
 	procps_status_t* p = NULL;
 
 	pidList = xzalloc(sizeof(*pidList));
+	if (!pidList)
+		return NULL;
 	while ((p = procps_scan(p, PSSCAN_PID|PSSCAN_COMM|PSSCAN_ARGVN))) {
 		if (comm_match(p, procName)
 		/* or we require argv0 to match (essential for matching reexeced /proc/self/exe)*/
@@ -411,12 +448,23 @@ pid_t* find_pid_by_name(const char *procName)
 		) {
 			if (p->state[0] != 'Z')
 			{
-				pidList = xrealloc_vector(pidList, 2, i);
+				pid_t *next = xrealloc_vector(pidList, 2, i);
+				if (!next) {
+					free_procps_scan(p);
+					free(pidList);
+					return NULL;
+				}
+				pidList = next;
 				pidList[i++] = p->pid;
 			}
 		}
 	}
 
+	if (errno) {
+		/* Do not return a partial process list after a scan failure. */
+		free(pidList);
+		return NULL;
+	}
 	pidList[i] = 0;
 	return pidList;
 }
@@ -428,7 +476,7 @@ int pids_main(char *appname)
 	int count = 0;
 
 	pidList = find_pid_by_name(appname);
-	for (pl = pidList; *pl; pl++) {
+	for (pl = pidList; pl && *pl; pl++) {
 		count++;
 		fprintf(stderr, "%u ", (unsigned)*pl);
 	}
@@ -447,7 +495,7 @@ int pids(char *appname)
 	int count = 0;
 
 	pidList = find_pid_by_name(appname);
-	for (pl = pidList; *pl; pl++) {
+	for (pl = pidList; pl && *pl; pl++) {
 		count++;
 	}
 	free(pidList);

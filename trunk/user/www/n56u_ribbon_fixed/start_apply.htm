@@ -48,6 +48,9 @@ function delay_redirect(next_url){
 }
 
 function top_delay_redirect(next_url){
+	// 兼容旧子页提交；不能把设备详情当作整个管理后台打开。
+	if (next_url.replace(/^\//, '') === 'device-map/clients.asp' && !parent.frameElement)
+		next_url = '/index.asp?flag=Client';
 	document.redirectForm.action = next_url;
 	document.redirectForm.target = "_parent";
 	document.redirectForm.submit();
@@ -61,8 +64,9 @@ function redirect(){
 }
 
 function initial(){
-	if (action_script === "networkmap_refresh" && typeof parent.networkmap_refresh_started === "function") {
-		parent.networkmap_refresh_started();
+	if (action_script === "networkmap_refresh") {
+		// 原页面已经切走或使用旧缓存时，扫描回复也不得跳转外层页面。
+		if (typeof parent.networkmap_refresh_started === "function") parent.networkmap_refresh_started();
 		return;
 	}
 	if(getflag == "set_language"){
@@ -89,10 +93,12 @@ function initial(){
         if (typeof parent.uiApplyCommitted === "function" && operation) {
             var destination = current_page.replace(/^\//, "");
             var safePage = /^[A-Za-z0-9_\/.-]+\.asp$/.test(destination) && destination.indexOf("..") < 0;
+            var clientPageAtTop = destination === 'device-map/clients.asp' && !parent.frameElement;
             var changedAddress = destination === "Advanced_LAN_Content.asp" || destination === "Advanced_APLAN_Content.asp";
             var link = changedAddress ? parent.uiSafeManagementLink(parent.document.form.lan_ipaddr.value) : "";
             parent.uiApplyCommitted(operation, function(){
                 if (changedAddress && link) parent.location.href = link;
+                else if (clientPageAtTop) parent.location.href = '/index.asp?flag=Client';
                 else if (safePage) parent.location.href = "/" + destination;
                 else parent.location.href = "/";
             });

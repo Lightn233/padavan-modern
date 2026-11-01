@@ -1770,7 +1770,7 @@ PNDIS_PACKET GetPacketFromRxRing(
 
 			pRxPacket = pRxCell->pNdisPacket;
 
-			DBGPRINT(RT_DEBUG_OFF, ("Ring No = %d\n", RxRingNo));
+			DBGPRINT(RT_DEBUG_TRACE, ("Ring No = %d\n", RxRingNo));
 			hex_dump("Invalid Pkt content", GET_OS_PKT_DATAPTR(pRxPacket), 32);
 		}
 
@@ -1874,10 +1874,11 @@ PNDIS_PACKET GetPacketFromRxRing(
 		if (pNewPacket)
 		{
 			RELEASE_NDIS_PACKET(pAd, pNewPacket, NDIS_STATUS_SUCCESS);
-#ifdef NEW_IXIA_METHOD
+#ifdef MAX_CONTINUOUS_TX_CNT
 			/*RX Drop*/
 			pAd->tr_ststic.rx[DROP_NO_BUF]++;
 #endif
+
 		}
 
 		pAd->RxResetDropCount++;

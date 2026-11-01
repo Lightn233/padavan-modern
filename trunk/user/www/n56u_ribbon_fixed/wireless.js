@@ -875,6 +875,7 @@ function wifi5UpdateHint() {
     if (ch === 0) msg += ' 自动选到 DFS 组合时会先静默检测，等待时间取决于最终信道和带宽。';
     else if (dfs) msg += ' 此组合启用前需静默检测约 ' + (wifi5CacSeconds(r, ch, bw) === 605 ? '10 分钟' : '65 秒') + '；检测到雷达会避让。';
     else if (bw) msg += ' 当前信道与带宽组合无需 DFS。';
+    if (bw === 160 && ch === 64) msg += ' 兼容提示：小米 12（HyperOS 3.0.3.0）在此组合下可能看不到另一 5 GHz 网络；本机已验证 36–60 主信道可保持 160 MHz，建议选 36。';
     e.textContent = msg;
     e.style.display = '';
 }

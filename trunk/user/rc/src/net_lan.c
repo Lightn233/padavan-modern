@@ -661,6 +661,7 @@ void
 stop_lan(int is_ap_mode)
 {
 	char *svcs[] = { "udhcpc", "detect_wan", NULL };
+	stop_bandwidth_limits();
 
 	if (is_ap_mode) {
 		notify_pause_detect_internet();

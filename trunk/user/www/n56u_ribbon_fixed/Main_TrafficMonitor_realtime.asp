@@ -19,7 +19,7 @@
 
 <script type="text/javascript" src="/ui/chart.js"></script>
 
-<script type="text/javascript" src="/net_speed_tabs.js"></script>
+<script type="text/javascript" src="/net_speed_tabs.js?v=9183052eef3b966a"></script>
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/popup.js"></script>

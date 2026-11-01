@@ -1,5 +1,6 @@
 #!/bin/sh
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 # AP 使用上级网络，跳过路由模式的启动、接管和自动恢复；保留用户启用设置。
 case "${1:-}" in
     start|restart|recover|resume|rollback|rules|fallback)
@@ -26,23 +27,8 @@ mkdir -p "$STATE_DIR"
 
 service_lock()
 {
-    n=0
-    while ! mkdir "$SERVICE_LOCK" 2>/dev/null; do
-        owner=$(cat "$SERVICE_LOCK/pid" 2>/dev/null)
-        case "$owner" in
-            ''|*[!0-9]*) ;;
-            *) if ! kill -0 "$owner" 2>/dev/null; then
-                   rm -f "$SERVICE_LOCK/pid"
-                   rmdir "$SERVICE_LOCK" 2>/dev/null
-                   continue
-               fi ;;
-        esac
-        n=$((n+1))
-        [ "$n" -lt 30 ] || return 1
-        sleep 1
-    done
-    echo $$ > "$SERVICE_LOCK/pid"
-    trap 'rm -f "$SERVICE_LOCK/pid"; rmdir "$SERVICE_LOCK" 2>/dev/null' 0
+    lockdir_take "$SERVICE_LOCK" 30 || return 1
+    trap 'lockdir_release "$SERVICE_LOCK"' 0
     trap 'exit 1' 1 2 15
 }
 
@@ -83,7 +69,7 @@ restore_persistent_backup()
     fi
     check_conf="$RAM_DIR/recovery-config.$$"
     cp "$backup_conf" "$check_conf" || return 1
-    if ! "$backup_exe" --config "$check_conf" --work-dir "$RAM_DIR" --check-config >/dev/null 2>&1; then
+    if ! busybox timeout -s KILL 30 "$backup_exe" --config "$check_conf" --work-dir "$RAM_DIR" --check-config >/dev/null 2>&1; then
         rm -f "$check_conf"
         return 1
     fi
@@ -151,41 +137,66 @@ clear_adg_rules()
     done
 }
 
-del_dns()
+# Build the complete DNS change next to its destination and publish only after
+# success. A full RAM filesystem must not leave dnsmasq.conf truncated.
+write_dns_config()
 {
-    [ -f "$DNSMASQ_CONF" ] || return 0
-    tmp_conf="/tmp/adguardhome-dnsmasq.$$"
-    legacy=0
-    grep -q '^server=127\.0\.0\.1#5335$' "$DNSMASQ_CONF" && legacy=1
-    awk -v legacy="$legacy" '
-      /^# BEGIN AdGuardHome forward$/ {owned=1; next}
-      /^# END AdGuardHome forward$/ {owned=0; next}
-      owned {next}
-      legacy && /^server=127\.0\.0\.1#5335$/ {next}
-      legacy && /^no-resolv$/ {next}
-      {print}
-    ' "$DNSMASQ_CONF" > "$tmp_conf" || return 1
-    if [ "$(md5sum "$tmp_conf" | cut -d' ' -f1)" != "$(md5sum "$DNSMASQ_CONF" | cut -d' ' -f1)" ]; then
-        cat "$tmp_conf" > "$DNSMASQ_CONF"
-        [ "$1" = defer ] || /sbin/restart_dhcpd
+    local dns_action=$1 dns_restart=$2 dns_pending before_dns after_dns
+    dns_pending="$DNSMASQ_CONF.adguardhome.$$"
+    if [ ! -f "$DNSMASQ_CONF" ]; then
+        [ "$dns_action" != clear ] || return 0
+        : > "$DNSMASQ_CONF" || return 1
     fi
-    rm -f "$tmp_conf"
-}
-
-configure_dns()
-{
-    before_dns=$(md5sum "$DNSMASQ_CONF" | cut -d' ' -f1)
-    del_dns defer || return 1
-    if [ "$(nvram get adg_redirect)" = 1 ]; then
-        cat >> "$DNSMASQ_CONF" <<'DNS_FORWARD'
+    cp -p "$DNSMASQ_CONF" "$dns_pending" || { rm -f "$dns_pending"; return 1; }
+    if ! awk '
+      function flush() {if(held) print previous; held=0}
+      /^# BEGIN AdGuardHome forward$/ {flush(); if(owned) bad=1; owned=1; next}
+      /^# END AdGuardHome forward$/ {if(!owned) bad=1; owned=0; next}
+      owned {next}
+      /^# BEGIN / {flush(); protected++; print; next}
+      /^# END / {flush(); if(protected) protected--; print; next}
+      protected {flush(); print; next}
+      /^no-resolv$/ {flush(); previous=$0; held=1; next}
+      /^server=127\.0\.0\.1#5335$/ {held=0; next}
+      {flush(); print}
+      END {flush(); if(owned || bad) exit 1}
+    ' "$DNSMASQ_CONF" > "$dns_pending"; then
+        rm -f "$dns_pending"
+        return 1
+    fi
+    if [ "$dns_action" = configure ] && [ "$(nvram get adg_redirect)" = 1 ]; then
+        if ! cat >> "$dns_pending" <<'DNS_FORWARD'
 # BEGIN AdGuardHome forward
 no-resolv
 server=127.0.0.1#5335
 # END AdGuardHome forward
 DNS_FORWARD
+        then
+            rm -f "$dns_pending"
+            return 1
+        fi
     fi
-    after_dns=$(md5sum "$DNSMASQ_CONF" | cut -d' ' -f1)
-    [ "$before_dns" = "$after_dns" ] || /sbin/restart_dhcpd
+    before_dns=$(md5sum "$DNSMASQ_CONF") || { rm -f "$dns_pending"; return 1; }
+    after_dns=$(md5sum "$dns_pending") || { rm -f "$dns_pending"; return 1; }
+    if [ "${before_dns%% *}" = "${after_dns%% *}" ]; then
+        rm -f "$dns_pending"
+        return 0
+    fi
+    if ! mv "$dns_pending" "$DNSMASQ_CONF"; then
+        rm -f "$dns_pending"
+        return 1
+    fi
+    [ "$dns_restart" = defer ] || /sbin/restart_dhcpd
+}
+
+del_dns()
+{
+    write_dns_config clear "$1"
+}
+
+configure_dns()
+{
+    write_dns_config configure ''
 }
 
 ensure_firewall_hook()
@@ -446,8 +457,8 @@ start_adg()
         finish_start
         return $?
     fi
+    del_dns || return 1
     clear_adg_rules
-    del_dns
     terminate_adg
     select_runtime || return 1
     mkdir -p "$WORK_DIR"
@@ -476,14 +487,14 @@ start_adg()
     set -- --config "$CONFIG_FILE" --work-dir "$WORK_DIR" --logfile /tmp/AdGuardHome.log
     # 调试时取消下一行的注释；日志轮转限制仍然生效。
     # set -- "$@" --verbose
-    if ! "$EXE" "$@" --check-config >/dev/null 2>&1; then
+    if ! busybox timeout -s KILL 30 "$EXE" "$@" --check-config >/dev/null 2>&1; then
         if [ "$WORK_DIR" != "$RWFS_WORK" ] || ! restore_persistent_backup || ! update_private_networks ||
-            ! "$EXE" "$@" --check-config >/dev/null 2>&1; then
+            ! busybox timeout -s KILL 30 "$EXE" "$@" --check-config >/dev/null 2>&1; then
             logger -t AdGuardHome '配置检查失败，DNS 重定向保持关闭'
             return 1
         fi
     fi
-    "$EXE" "$@" >/dev/null 2>&1 &
+    "$EXE" "$@" 8>&- 9>&- >/dev/null 2>&1 &
     n=0
     had_dns_ready=0
     while [ "$n" -lt 30 ]; do
@@ -499,8 +510,8 @@ start_adg()
         sleep 1
         n=$((n+1))
     done
+    del_dns || return 1
     clear_adg_rules
-    del_dns
     terminate_adg
     # 新程序运行失败时最多回退一次，避免重复恢复或无限重启。
     if [ "$had_dns_ready" = 0 ] && [ "$WORK_DIR" = "$RWFS_WORK" ] && [ "${rollback_attempted:-0}" = 0 ]; then
@@ -516,8 +527,8 @@ start_adg()
 
 stop_adg()
 {
+    del_dns || return 1
     clear_adg_rules
-    del_dns
     terminate_adg
     # 停止或重启服务时保留数据库和缓存；整机重启会清空 /tmp。
     [ -x "$WATCH_SCRIPT" ] && "$WATCH_SCRIPT" save-now
@@ -536,7 +547,7 @@ case "$1" in
         ;;
     restart)
         rm -f "$STATE_DIR/manual-stop"
-        stop_adg
+        stop_adg || exit 1
         start_adg && rm -f "$STATE_DIR/health-fallback"
         ;;
     fallback)
@@ -553,7 +564,7 @@ case "$1" in
         fi
         ;;
     rollback)
-        stop_adg
+        stop_adg || exit 1
         select_runtime && restore_persistent_backup && start_adg && "$WATCH_SCRIPT" save-now
         ;;
     rules)

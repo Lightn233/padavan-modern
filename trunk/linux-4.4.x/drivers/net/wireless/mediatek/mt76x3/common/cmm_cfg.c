@@ -27,6 +27,7 @@
 
 
 #include "rt_config.h"
+#include "qa_agent.h"
 
 static BOOLEAN RT_isLegalCmdBeforeInfUp(RTMP_STRING *SetCmd);
 
@@ -1690,7 +1691,7 @@ INT set_get_fid(RTMP_ADAPTER *pAd, RTMP_STRING *arg)
     while (1) {
         for (dw_idx = 0; dw_idx < 8; dw_idx++) {
             RTMP_IO_READ32(pAd, ((MT_PCI_REMAP_ADDR_1 + (((value & 0x0fff0000) >> 16) * 128)) + (dw_idx * 4)), &dw_content);//get head FID.
-            DBGPRINT(RT_DEBUG_ERROR, ("pkt:%d, fid:%x, dw_idx = %d, dw_content = 0x%x\n", loop, ((value & 0x0fff0000) >> 16), dw_idx, dw_content));
+            DBGPRINT(RT_DEBUG_WARN, ("pkt:%d, fid:%x, dw_idx = %d, dw_content = 0x%x\n", loop, ((value & 0x0fff0000) >> 16), dw_idx, dw_content));
         }
         RTMP_IO_WRITE32(pAd, 0x8028, value);
         RTMP_IO_READ32(pAd, 0x8028, &next_fid_addr);//get next FID.
@@ -1968,7 +1969,7 @@ INT SetTxRxCr_Proc(RTMP_ADAPTER *pAd, RTMP_STRING *arg)
 		RTMP_IO_READ32(pAd, 0x20024, &mac_val);
 
 		DBGPRINT(RT_DEBUG_ERROR, ("0x6000004c[0x81812A2A]=0x%08x\n", mac_val));
-		DBGPRINT(RT_DEBUG_ERROR, ("\n\n\n\n\n\n\n\n\n\n"));
+		//DBGPRINT(RT_DEBUG_ERROR, ("\n\n\n\n\n\n\n\n\n\n"));
 		DBGPRINT(RT_DEBUG_ERROR, ("=============================================\n"));
 	}
 	
@@ -2769,3 +2770,104 @@ VOID EnableRadioChstats(
 	
 }
 #endif
+
+#ifdef OFFCHANNEL_SCAN_FEATURE
+INT Set_ApOffChanScan_Proc(
+	IN	PRTMP_ADAPTER	pAd,
+	IN	PSTRING			arg)
+{
+	POS_COOKIE pObj;
+	UINT channel = 0;
+	UINT timeout = 0;
+	INT32 i, j, count;
+	CHAR scantype[8];
+	CHAR temp[33];
+	UCHAR ifIndex;
+	struct wifi_dev *wdev = NULL;
+
+	pObj = (POS_COOKIE) pAd->OS_Cookie;
+
+	if (!RTMP_TEST_FLAG(pAd, fRTMP_ADAPTER_INTERRUPT_IN_USE)) {
+		DBGPRINT(RT_DEBUG_TRACE, ("INFO::Network is down!\n"));
+		return -ENETDOWN;
+	}
+
+	i = 0;
+	j = 0;
+	count = 0;
+	while (arg[j] != '\0') {
+		temp[i] = arg[j];
+		j++;
+		if (temp[i] == ':' || arg[j] == '\0') {
+		    if (temp[i] == ':') {
+				count++;
+				switch (count) {
+				case 1:
+				    temp[i] = '\0';
+					if ((strlen(temp) != 0) && (strlen(temp) <= 7)) {
+						strcpy(scantype, temp);
+						if (strcmp(scantype, "active") && strcmp(scantype, "passive")) {
+							DBGPRINT(RT_DEBUG_ERROR, ("wrong scan type argument\n"));
+							return FALSE;
+						}
+					} else if (strlen(temp) > 7) {
+						DBGPRINT(RT_DEBUG_ERROR, ("wrong scan type argument\n"));
+						return FALSE;
+					}
+					i = -1;
+					break;
+				case 2:
+					temp[i] = '\0';
+					if ((strlen(temp) != 0) && (strlen(temp) <= 3)) {
+						channel = simple_strtol(temp, 0, 10);
+						if (!ChannelSanity(pAd, channel)) {
+							DBGPRINT(RT_DEBUG_ERROR, ("wrong channel number\n"));
+							return FALSE;
+					    }
+					} else if (strlen(temp) > 3) {
+						DBGPRINT(RT_DEBUG_ERROR, ("wrong channel number\n"));
+						return FALSE;
+					}
+					i = -1;
+					break;
+				default:
+					if (count > 2) {
+						DBGPRINT(RT_DEBUG_ERROR, ("wrong number of arguments\n"));
+						return FALSE;
+					}
+					break;
+				}
+			} else if (arg[j] == '\0') {
+				temp[i+1] = '\0';
+				if ((strlen(temp) != 0) && (strlen(temp) <= 10) && (simple_strtol(temp, 0, 10) < 0xffffffff)) {
+					timeout = simple_strtol(temp, 0, 10);
+				} else if (strlen(temp)) {
+					DBGPRINT(RT_DEBUG_ERROR, ("wrong Timeout value \n"));
+					return FALSE;
+				}
+			}
+		}
+		i++;
+	}
+
+	ifIndex = pObj->ioctl_if;
+	if (pObj->ioctl_if_type == INT_MBSSID)
+		wdev = &pAd->ApCfg.MBSSID[ifIndex].wdev;
+	else
+		wdev = &pAd->ApCfg.MBSSID[0].wdev;
+	/* Make compatible with application path */
+	pAd->ScanCtrl.Num_Of_Channels = 1;
+	pAd->ScanCtrl.ScanTime[0] = 0;
+	pAd->ScanCtrl.CurrentGivenChan_Index = 0;
+	pAd->ScanCtrl.state = OFFCHANNEL_SCAN_START;
+	if (!strcmp(scantype, "passive"))
+		ApSiteSurveyNew_by_wdev(pAd, channel, timeout, SCAN_PASSIVE, FALSE, wdev);
+	else if (!strcmp(scantype, "active"))
+		ApSiteSurveyNew_by_wdev(pAd, channel, timeout, SCAN_ACTIVE, FALSE, wdev);
+
+	DBGPRINT(RT_DEBUG_TRACE, ("%s\n", __func__));
+
+    return TRUE;
+}
+#endif
+

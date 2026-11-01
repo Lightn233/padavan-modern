@@ -1,5 +1,6 @@
 #!/bin/sh
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 
 result=0
 mtd_part_name="Storage"
@@ -7,7 +8,9 @@ mtd_part_dev="/dev/mtdblock5"
 mtd_part_size=65536
 dir_storage="/etc/storage"
 slk="/tmp/.storage_locked"
-tmp="/tmp/storage.tar"
+# HTTP uploads/downloads use transfer; active operations use private files.
+transfer="/tmp/storage.tar.bz2"
+tmp="/tmp/storage.$$.tar"
 tbz="${tmp}.bz2"
 hsh="/tmp/hashes/storage_md5"
 
@@ -40,25 +43,24 @@ func_stop_apps()
 
 func_start_apps()
 {
-	/sbin/rstats
+	/sbin/rstats 8>&- 9>&-
 }
 
 func_load()
 {
-	local fsz
-
-	bzcat $mtd_part_dev > $tmp 2>/dev/null
-	fsz=`stat -c %s $tmp 2>/dev/null`
-	if [ -n "$fsz" ] && [ $fsz -gt 0 ] ; then
-		md5sum $tmp > $hsh
-		tar xf $tmp -C $dir_storage 2>/dev/null
-	else
-		result=1
-		rm -f $hsh
-		logger -t "Storage load" "Invalid storage data in MTD partition: $mtd_part_dev"
-	fi
-	rm -f $tmp
-	rm -f $slk
+    # A partially decompressed archive is not a successful boot restore.
+    if bzcat "$mtd_part_dev" > "$tmp" 2>/dev/null &&
+        [ -s "$tmp" ] && tar tf "$tmp" >/dev/null 2>&1 &&
+        tar xpf "$tmp" -C "$dir_storage" 2>/dev/null; then
+        mkdir -p /tmp/hashes
+        md5sum "$tmp" > "$hsh"
+    else
+        result=1
+        rm -f "$hsh"
+        logger -t "Storage load" "Invalid or incomplete storage data in MTD partition: $mtd_part_dev"
+    fi
+    rm -f "$tmp"
+    rm -f "$slk"
 }
 
 func_tarb()
@@ -74,7 +76,7 @@ func_tarb()
 
 func_save()
 {
-    local fsz tar_hash restore_limit archive_size
+    local fsz tar_hash saved_hash restore_limit archive_size
     echo "Save storage files to MTD partition \"$mtd_part_dev\""
     rm -f "$tbz"
     # 旧固件在启动钩子前将 Storage 恢复到 6 MiB 的 /etc。
@@ -87,12 +89,15 @@ func_save()
         rm -f "$tmp"
         return 1
     fi
-    if md5sum -c -s "$hsh" 2>/dev/null; then
+    tar_hash=$(md5sum "$tmp") || { result=1; return 1; }
+    saved_hash=''
+    [ ! -f "$hsh" ] || read -r saved_hash ignored_path < "$hsh" || saved_hash=''
+    # Compare content, not the PID-specific name stored by md5sum.
+    if [ -n "$saved_hash" ] && [ "${tar_hash%% *}" = "$saved_hash" ]; then
         echo 'Storage hash is not changed, skip write to MTD partition. Exit.'
         rm -f "$tmp"
         return 0
     fi
-    tar_hash=$(md5sum "$tmp")
     if ! bzip2 -9 "$tmp" 2>/dev/null; then
         result=1
         echo 'Error! Storage compression FAILED'
@@ -125,14 +130,21 @@ func_backup()
 		result=1
 		logger -t "Storage backup" "Cannot create BZ2 file!"
 	fi
-	rm -f $tmp
+    rm -f "$tmp"
+    if [ "$result" = 0 ] && ! mv "$tbz" "$transfer"; then
+        result=1
+        logger -t "Storage backup" "Cannot publish complete backup"
+    fi
 }
 
 func_restore()
 {
-	local fsz tmp_storage
+	local fsz tmp_storage restore_stage restore_previous
 
-	[ ! -f "$tbz" ] && exit 1
+    [ -f "$transfer" ] || { result=1; return 1; }
+    # Consume the completed upload under the operation lock; a background save
+    # cannot replace or remove the archive being restored.
+    mv "$transfer" "$tbz" || { result=1; return 1; }
 
 	fsz=`stat -c %s $tbz 2>/dev/null`
 	if [ -z "$fsz" ] || [ $fsz -lt 16 ] || [ $fsz -gt $mtd_part_size ] ; then
@@ -145,7 +157,7 @@ func_restore()
 	tmp_storage="/tmp/storage"
 	rm -rf $tmp_storage
 	mkdir -p -m 755 $tmp_storage
-	tar xjf $tbz -C $tmp_storage 2>/dev/null
+	tar xjpf "$tbz" -C "$tmp_storage" 2>/dev/null
 	if [ $? -ne 0 ] ; then
 		result=1
 		rm -f $tbz
@@ -161,16 +173,43 @@ func_restore()
 		return 1
 	fi
 
-	func_stop_apps
-
-	rm -f $slk
-	rm -f $tbz
-	rm -rf $dir_storage
-	mkdir -p -m 755 $dir_storage
-	cp -rf $tmp_storage /etc
-	rm -rf $tmp_storage
-
-	func_start_apps
+    # Stage on the destination filesystem before moving the working settings.
+    # Disk-full/copy errors must leave /etc/storage and its contents untouched.
+    restore_stage="${dir_storage}.restore.$$"
+    restore_previous="${dir_storage}.previous.$$"
+    if [ -e "$restore_stage" ] || [ -L "$restore_stage" ] ||
+        [ -e "$restore_previous" ] || [ -L "$restore_previous" ]; then
+        result=1
+        logger -t "Storage restore" "Restore staging path already exists"
+        rm -rf "$tmp_storage"
+        return 1
+    fi
+    if ! cp -a "$tmp_storage" "$restore_stage"; then
+        result=1
+        logger -t "Storage restore" "Cannot stage restored settings; current settings preserved"
+        rm -rf "$restore_stage" "$tmp_storage"
+        return 1
+    fi
+    func_mdir
+    func_stop_apps
+    if ! mv "$dir_storage" "$restore_previous"; then
+        result=1
+        rm -rf "$restore_stage" "$tmp_storage"
+        func_start_apps
+        return 1
+    fi
+    if ! mv "$restore_stage" "$dir_storage"; then
+        result=1
+        # Keep the old directory even if restoring its name also fails.
+        mv "$restore_previous" "$dir_storage" ||
+            logger -t "Storage restore" "Previous settings retained in $restore_previous"
+        rm -rf "$restore_stage" "$tmp_storage"
+        func_start_apps
+        return 1
+    fi
+    rm -f "$slk" "$tbz" "$hsh"
+    rm -rf "$restore_previous" "$tmp_storage"
+    func_start_apps
 }
 
 func_erase()
@@ -687,23 +726,8 @@ EOF
 }
 
 operation_lock="/tmp/.storage_operation"
-attempt=0
-while ! mkdir "$operation_lock" 2>/dev/null; do
-    owner=$(cat "$operation_lock/pid" 2>/dev/null)
-    case "$owner" in
-        ''|*[!0-9]*) ;;
-        *) if ! kill -0 "$owner" 2>/dev/null; then
-               rm -f "$operation_lock/pid"
-               rmdir "$operation_lock" 2>/dev/null
-               continue
-           fi ;;
-    esac
-    attempt=$((attempt+1))
-    [ "$attempt" -lt 30 ] || exit 1
-    sleep 1
-done
-echo $$ > "$operation_lock/pid"
-trap 'rm -f "$operation_lock/pid"; rmdir "$operation_lock" 2>/dev/null' 0
+lockdir_take "$operation_lock" 30 || exit 1
+trap 'rm -f "$tmp" "$tbz"; lockdir_release "$operation_lock"' 0
 trap 'exit 1' 1 2 15
 
 case "$1" in

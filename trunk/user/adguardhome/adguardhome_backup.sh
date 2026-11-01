@@ -2,6 +2,7 @@
 # 维护入口固定目录、持有服务锁；不启动或重启 AdGuardHome。
 set -eu
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 root=/media/mtd_rwfs/AdGuardHome
 lock=/tmp/.adguardhome_service_lock
 helper=/usr/bin/adguardhome-backup
@@ -10,16 +11,16 @@ case "${1:-}" in status|clean) ;; *) reply invalid; exit 2 ;; esac
 [ -x "$helper" ] || { reply unavailable; exit 0; }
 awk '$2=="/media/mtd_rwfs" && $3=="ubifs" && (","$4",")~/,rw,/ {ok=1} END {exit !ok}' /proc/mounts || { reply unavailable; exit 0; }
 if [ "$1" = status ]; then
-    [ ! -d "$lock" ] || { reply busy; exit 0; }
+    lockdir_take "$lock" 0 || { reply busy; exit 0; }
+    trap 'lockdir_release "$lock"' 0
     "$helper" status || :
     exit 0
 fi
 token=${2:-}
 case "$token" in ''|*[!0-9a-f-]*) reply invalid; exit 2 ;; esac
 [ "${#token}" -le 511 ] || { reply invalid; exit 2; }
-mkdir "$lock" 2>/dev/null || { reply busy; exit 0; }
-echo $$ > "$lock/pid"
-trap 'rm -f "$lock/pid" "$lock/result"; rmdir "$lock" 2>/dev/null || :' 0
+lockdir_take "$lock" 0 || { reply busy; exit 0; }
+trap 'rm -f "$lock/result"; lockdir_release "$lock"' 0
 trap 'exit 1' 1 2 15
 set -- $(pidof AdGuardHome || :)
 [ "$#" = 1 ] || { reply service-not-ready; exit 0; }

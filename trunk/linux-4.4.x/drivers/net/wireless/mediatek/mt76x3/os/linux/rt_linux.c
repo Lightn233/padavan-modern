@@ -47,9 +47,10 @@
 #endif
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-#include "../../../../../net/nat/hw_nat/ra_nat.h"
-#include "../../../../../net/nat/hw_nat/frame_engine.h"
+#include "nat/hw_nat/ra_nat.h"
+#include "nat/hw_nat/frame_engine.h"
 #endif
+
 
 /* TODO */
 #undef RT_CONFIG_IF_OPMODE_ON_AP
@@ -91,6 +92,14 @@ static inline void netdev_priv_set(struct net_device *dev, void *priv)
 #endif
 }
 
+/*
+#define RT_DEBUG_OFF        0
+#define RT_DEBUG_ERROR      1
+#define RT_DEBUG_WARN       2
+#define RT_DEBUG_TRACE      3
+#define RT_DEBUG_INFO       4
+#define RT_DEBUG_LOUD       5
+*/
 
 ULONG RTDebugLevel = RT_DEBUG_ERROR;
 ULONG RTDebugFunc = 0;
@@ -1622,6 +1631,11 @@ void RtmpOSNetDevDetach(PNET_DEV pNetDev)
 	struct net_device_ops *pNetDevOps = (struct net_device_ops *)pNetDev->netdev_ops;
 #endif
 
+#ifdef CONFIG_RA_HW_NAT_WIFI_NEW_ARCH
+	/* Closed virtual interfaces may still be registered with hardware NAT. */
+	RT_MOD_HNAT_DEREG(pNetDev);
+#endif
+
 	unregister_netdevice(pNetDev);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31)
@@ -2267,16 +2281,18 @@ Return Value:
 Note:
 ========================================================================
 */
+#ifdef MAX_CONTINUOUS_TX_CNT
+INT rx_pkt_to_os = 1;
+#endif
 VOID RtmpOsPktRcvHandle(PNDIS_PACKET pNetPkt)
 {
 	struct sk_buff *pRxPkt = RTPKT_TO_OSPKT(pNetPkt);
 
-
-	netif_rx(pRxPkt);
-#ifdef NEW_IXIA_METHOD
+#ifdef MAX_CONTINUOUS_TX_CNT
 	if (IS_OSEXPECTED_LENGTH(RTPKT_TO_OSPKT(pRxPkt)->len + 18))
 		rx_pkt_to_os++;
 #endif
+	netif_rx(pRxPkt);
 }
 
 

@@ -20,7 +20,9 @@
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
+<script type="text/javascript" src="/help.js"></script>
 <script>
+var $j = jQuery.noConflict();
 
 <% login_state_hook(); %>
 
@@ -149,7 +151,7 @@ function done_validating(action){
 
                                     <table width="100%" cellpadding="4" cellspacing="0" class="table">
                                         <tr>
-                                            <th width="50%"><#InetCheckMode#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,1);"><#InetCheckMode#></a></th>
                                             <td>
                                                 <select name="di_poll_mode" class="input" onchange="poll_mode_changed();">
                                                     <option value="0" <% nvram_match_x("", "di_poll_mode", "0", "selected"); %>><#InetCheckModeItem0#> (*)</option>
@@ -164,42 +166,42 @@ function done_validating(action){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#InetCheckHosts#></th>
                                         </tr>
                                         <tr>
-                                            <th width="50%"><#InetCheckHostIP4#> 1:</th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 1:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr0" style="width: 145px" value="<% nvram_get_x("","di_addr0"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port0" style="width: 44px;"  value="<% nvram_get_x("","di_port0"); %>" onkeypress="return is_number(this,event);"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckHostIP4#> 2:</th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 2:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr1" style="width: 145px" value="<% nvram_get_x("","di_addr1"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port1" style="width: 44px;"  value="<% nvram_get_x("","di_port1"); %>" onkeypress="return is_number(this,event);"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckHostIP4#> 3:</th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 3:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr2" style="width: 145px" value="<% nvram_get_x("","di_addr2"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port2" style="width: 44px;"  value="<% nvram_get_x("","di_port2"); %>" onkeypress="return is_number(this,event);"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckHostIP4#> 4:</th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 4:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr3" style="width: 145px" value="<% nvram_get_x("","di_addr3"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port3" style="width: 44px;"  value="<% nvram_get_x("","di_port3"); %>" onkeypress="return is_number(this,event);"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckHostIP4#> 5:</th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 5:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr4" style="width: 145px" value="<% nvram_get_x("","di_addr4"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port4" style="width: 44px;"  value="<% nvram_get_x("","di_port4"); %>" onkeypress="return is_number(this,event);"/>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckHostIP4#> 6:</th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,2);"><#InetCheckHostIP4#></a> 6:</th>
                                             <td>
                                                 <input type="text" maxlength="15" class="input" size="15" name="di_addr5" style="width: 145px" value="<% nvram_get_x("","di_addr5"); %>" onkeypress="return is_ipaddr(this,event);"/>&nbsp;:
                                                 <input type="text" maxlength="5" class="input" size="10" name="di_port5" style="width: 44px;"  value="<% nvram_get_x("","di_port5"); %>" onkeypress="return is_number(this,event);"/>
@@ -212,7 +214,7 @@ function done_validating(action){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#InetCheckPoll#></th>
                                         </tr>
                                         <tr>
-                                            <th width="50%"><#InetCheckPeriod#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,3);"><#InetCheckPeriod#></a></th>
                                             <td>
                                                 <input type="text" maxlength="3" class="input" size="15" style="width: 94px;" name="di_time_done" value="<% nvram_get_x("", "di_time_done"); %>" onkeypress="return is_number(this,event);"/>&nbsp;/
                                                 <input type="text" maxlength="3" class="input" size="15" style="width: 94px;" name="di_time_fail" value="<% nvram_get_x("", "di_time_fail"); %>" onkeypress="return is_number(this,event);"/>
@@ -220,7 +222,7 @@ function done_validating(action){
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#InetCheckTimeout#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,4);"><#InetCheckTimeout#></a></th>
                                             <td>
                                                 <input type="text" maxlength="2" class="input" size="15" name="di_timeout" value="<% nvram_get_x("", "di_timeout"); %>" onkeypress="return is_number(this,event);"/>
                                                 &nbsp;<span style="color:#888;">[1..10]</span>
@@ -233,14 +235,14 @@ function done_validating(action){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#InetCheckEvents#></th>
                                         </tr>
                                         <tr>
-                                            <th width="50%"><#InetCheckLostDelay#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,5);"><#InetCheckLostDelay#></a></th>
                                             <td>
                                                 <input type="text" maxlength="3" class="input" size="15" name="di_lost_delay" value="<% nvram_get_x("", "di_lost_delay"); %>" onkeypress="return is_number(this,event);"/>
                                                 &nbsp;<span style="color:#888;">[0..600]</span>
                                             </td>
                                         </tr>
                                         <tr id="row_lost_action">
-                                            <th><#InetCheckLostAction#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,6);"><#InetCheckLostAction#></a></th>
                                             <td>
                                                 <select name="di_lost_action" class="input" style="width: 320px;" onchange="lost_action_changed();">
                                                     <option value="0" <% nvram_match_x("", "di_lost_action", "0", "selected"); %>><#InetCheckLostItem0#></option>
@@ -251,7 +253,7 @@ function done_validating(action){
                                             </td>
                                         </tr>
                                         <tr id="row_recon_pause" style="display:none;">
-                                            <th><#InetCheckReconPause#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,25,7);"><#InetCheckReconPause#></a></th>
                                             <td>
                                                 <input type="text" maxlength="3" class="input" size="15" name="di_recon_pause" value="<% nvram_get_x("", "di_recon_pause"); %>" onkeypress="return is_number(this,event);"/>
                                                 &nbsp;<span style="color:#888;">[0..600]</span>

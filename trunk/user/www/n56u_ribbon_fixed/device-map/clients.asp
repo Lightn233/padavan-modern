@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
+<script>
+// 设备列表是首页的详情子页；旧书签或失效提交也必须回到完整后台。
+if (window.top === window.self) window.location.replace('/index.asp?flag=Client');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/ui/base.css?v=1">
 <link rel="stylesheet" href="/ui/icons.css?v=1">
@@ -16,6 +20,9 @@
 
 <script type="text/javascript" src="/jquery.js"></script>
 <script src="/ui/core.js?v=1"></script>
+<link rel="stylesheet" href="/ui/bandwidth.css?v=1">
+<script src="/ui/bandwidth.js?v=1"></script>
+
 
 <script type="text/javascript" src="/state.js"></script>
 <script src="/ui/state-modern.js?v=1"></script>
@@ -45,6 +52,11 @@ var scan_pending = false;
 var client_request = false;
 var submit_timer = null;
 var scan_snapshot = ipmonitor.slice();
+var client_refresh_time = '';
+var client_refresh_label = '';
+var ipmonitor_last = null;
+var nmap_fullscan_last = null;
+var wireless_last = null;
 
 function initial(){
 	if (sw_mode == "3") {
@@ -53,6 +65,7 @@ function initial(){
 	flash_button();
 	prepare_clients();
 	show_clients();
+	client_refresh_status('idle', '已载入设备列表');
 	check_full_scan_done();
 }
 
@@ -158,6 +171,8 @@ function check_full_scan_done(){
 		if (Date.now() >= scan_deadline) { scan_failed(); return; }
 		if (!scan_pending) scan_timer = setTimeout(update_clients, 2000);
 	} else {
+		if (scan_deadline) client_status('扫描完成，设备列表已更新');
+		else $('LoadingBar').style.display = 'none';
 		scan_deadline = 0;
 		scan_failures = 0;
 		scan_snapshot = ipmonitor.slice();
@@ -168,24 +183,82 @@ function check_full_scan_done(){
 function refresh_clients(){
 	if (client_request) return;
 	scan_failures = 0;
-	update_clients();
+	update_clients(true);
 }
 
-function update_clients() {
+// 手动刷新结果与后台扫描提示分开，避免轮询覆盖刚才的操作反馈。
+function client_refresh_status(state, message){
+	var box = $('client_refresh_feedback');
+	box.setAttribute('data-state', state);
+	box.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+	$('client_refresh_message').textContent = message;
+}
+
+function client_list_signature(rows){
+	return JSON.stringify(rows.map(function(row){ return JSON.stringify(row); }).sort());
+}
+
+function client_wireless_signature(table){
+	return JSON.stringify(Object.keys(table).sort().map(function(mac){ return [mac, table[mac]]; }));
+}
+
+function client_refresh_clock(){
+	var now = new Date();
+	function pad(n){ return ('0' + n).slice(-2); }
+	return pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+}
+
+function client_request_failed(manual, reason){
+	if (manual) {
+		var message = '刷新失败' + (reason ? '（' + reason + '）' : '') + '，保留上次列表；请重试';
+		if (client_refresh_time) message += '。上次成功：' + client_refresh_time;
+		client_refresh_status('error', message);
+	}
+	if (++scan_failures >= 3 || !scan_deadline || Date.now() >= scan_deadline) scan_failed();
+	else scan_timer = setTimeout(update_clients, 2000);
+}
+
+function update_clients(manual) {
 	if (client_request) return;
+	manual = manual === true;
 	clearTimeout(scan_timer);
 	client_request = true;
-	$("refresh_list").disabled = true;
+	var button = $('refresh_list');
+	var buttonLabel = $('client_refresh_label');
+	if (!client_refresh_label) client_refresh_label = buttonLabel.textContent;
+	var previous = client_list_signature(ipmonitor);
+	var previousWireless = client_wireless_signature(wireless);
+	button.disabled = true;
+	if (manual) {
+		buttonLabel.textContent = '刷新中…';
+		button.setAttribute('data-loading', 'true');
+		client_refresh_status('loading', '正在读取设备列表…');
+	}
+	// 先清空响应变量，异常页面不能冒用上一次结果显示成功。
+	ipmonitor_last = null;
+	nmap_fullscan_last = null;
+	wireless_last = null;
 	$j.ajax({
 		url: '/lan_clients.asp', dataType: 'script', cache: false, timeout: 5000,
-		error: function() {
-			if (++scan_failures >= 3 || !scan_deadline || Date.now() >= scan_deadline) scan_failed();
-			else scan_timer = setTimeout(update_clients, 2000);
+		error: function(xhr, status) {
+			client_request_failed(manual, status === 'timeout' ? '请求超时' : '请求未成功');
 		},
 		success: function() {
+			if (!Array.isArray(ipmonitor_last) || !ipmonitor_last.every(function(row){
+				return Array.isArray(row) && row.length >= 6 && row.slice(0,6).every(function(value){ return typeof value === 'string'; });
+			}) || !wireless_last || typeof wireless_last !== 'object' || Array.isArray(wireless_last) ||
+				!Object.keys(wireless_last).every(function(mac){
+					return /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/i.test(mac) && typeof wireless_last[mac] === 'number' && isFinite(wireless_last[mac]);
+				}) ||
+				(nmap_fullscan_last !== '0' && nmap_fullscan_last !== '1' && nmap_fullscan_last !== 0 && nmap_fullscan_last !== 1)) {
+				client_request_failed(manual, '返回数据异常');
+				return;
+			}
 			scan_failures = 0;
 			nmap_fullscan = nmap_fullscan_last;
-			// 后台扫描会清空并重建结果，完成前按 MAC 合并，不能按名称合并。
+			// 名单与无线信号一起刷新；不能合并旧关联，否则离线设备会残留旧 RSSI。
+			wireless = wireless_last;
+			// 兼容旧扫描程序逐步返回的结果；按 MAC 合并，不能按名称合并。
 			if (nmap_fullscan == "1" || scan_pending) {
 				scan_snapshot = merge_scan_clients(scan_snapshot, ipmonitor_last);
 				ipmonitor = scan_snapshot.slice();
@@ -193,12 +266,20 @@ function update_clients() {
 			clients = getclients(1,0);
 			prepare_clients();
 			show_clients();
-			client_status('已更新设备列表');
 			check_full_scan_done();
+			if (manual) {
+				client_refresh_time = client_refresh_clock();
+				var message = '刷新成功 · ' + client_refresh_time + ' · 显示 ' + clients.length + ' 台设备';
+				message += previous === client_list_signature(ipmonitor) ? ' · 列表无变化' : ' · 列表已更新';
+				if (previousWireless !== client_wireless_signature(wireless)) message += ' · 无线状态已更新';
+				client_refresh_status('success', message);
+			}
 		},
 		complete: function() {
 			client_request = false;
-			$("refresh_list").disabled = false;
+			button.disabled = false;
+			buttonLabel.textContent = client_refresh_label;
+			button.setAttribute('data-loading', 'false');
 		}
 	});
 }
@@ -213,14 +294,15 @@ function short_client_name(name){
 	return name;
 }
 
-function add_client_row(table, atIndex, client, blocked, j){
-	var row = table.insertRow(atIndex);
+function add_client_row(table, client, blocked, j){
+	var row = table.tBodies[0].insertRow(-1);
 	var typeCell = row.insertCell(0);
 	var nameCell = row.insertCell(1);
 	var ipCell = row.insertCell(2);
 	var macCell = row.insertCell(3);
 	var rssiCell = row.insertCell(4);
-	var blockCell = row.insertCell(5);
+	var limitCell = row.insertCell(5);
+	var blockCell = row.insertCell(6);
 	
 	var arpon = <% nvram_get_x("","dhcp_static_arp"); %>;
 	var mdhcp = <% nvram_get_x("","dhcp_static_x"); %>;
@@ -239,6 +321,7 @@ function add_client_row(table, atIndex, client, blocked, j){
 	typeCell.style.textAlign = "center";
 	typeCell.innerHTML = "<img title='"+ DEVICE_TYPE[client[5]]+"' src='/bootstrap/img/wl_device/" + client[5] +".gif'>";
 	var displayName = short_client_name(client[0]);
+	PadavanBandwidth.addDevice(limitCell, client[2], displayName);
 	nameCell.title = client[0];
 	if (client[6] == "1") {
 		var nameLink = document.createElement('a');
@@ -251,8 +334,15 @@ function add_client_row(table, atIndex, client, blocked, j){
 	}
 	ipCell.innerHTML = (client[6] == "1") ? "<a href=http://" + client[1] + " target='blank'>" + client[1] + "</a>" : client[1];
 	macCell.innerHTML = "<a target='_blank' href='https://services13.ieee.org/RST/standards-ra-web/rest/assignments/?registry=MAC&text=" + client[2].substr(0,6) + "'>" + mac_add_delimiters(client[2]) + "</a>";
+	rssiCell.textContent = '—';
+	rssiCell.title = '当前未取得本机无线信号数据；有线、经其他接入点连接或已离线的设备都可能没有此值。设备图标不代表当前连接方式。';
 	if (client[3] == 10){
-		rssiCell.innerHTML = client[4].toString();
+		var rssi = client[4];
+		// 驱动用 -127 表示未取得有效采样，不把它作为真实信号强度展示。
+		if (typeof rssi === 'number' && isFinite(rssi) && rssi > -127 && rssi < 0) {
+			rssiCell.textContent = rssi + ' dBm';
+			rssiCell.title = 'RM2100 接收到的无线信号强度；刷新列表会重新读取。';
+		} else rssiCell.title = '无线已关联，但驱动尚未返回有效信号值。';
 	}
 	if(list_type != "1" && sw_mode != "3"){
 		blockCell.style.textAlign = "center";
@@ -268,32 +358,33 @@ function show_clients(){
 	table1 = $('Clients_table');
 	table2 = $('xClients_table');
 	
-	while (table1.rows.length > 2)
+	while (table1.tBodies[0].rows.length)
 		table1.deleteRow(-1);
-	while (table2.rows.length > 2)
+	while (table2.tBodies[0].rows.length)
 		table2.deleteRow(-1);
 	
 	var hasBlocked = false;
 	for(j=0, i=0, k=0; j < clients.length; j++){
 		if(clients[j][7] == "u" || sw_mode == "3"){
-			add_client_row(table1, k+2, clients[j], false, j);
+			add_client_row(table1, clients[j], false, j);
 			k++;
 		}
 		else if(clients[j][7] == "b"){
-			add_client_row(table2, i+2, clients[j], true, j);
+			add_client_row(table2, clients[j], true, j);
 			hasBlocked = true;
 			i++;
 		}
 	}
 
 	table2.style.display = hasBlocked ? "inline" : "none";
+	$('client_count').textContent = k + ' 台';
 
-	var NDRow = "<tr><td colspan='6'><div class='alert alert-info'><#Nodata#></div></td></tr>";
+	var NDRow = "<tr><td colspan='7'><div class='alert alert-info'><#Nodata#></div></td></tr>";
 
-	if (table1.rows.length < 3)
+	if (!table1.tBodies[0].rows.length)
 		$j("#Clients_table tbody").append(NDRow);
 
-	if (table2.rows.length < 3 && sw_mode != "3")
+	if (!table2.tBodies[0].rows.length && sw_mode != "3")
 		$j("#xClients_table tbody").append(NDRow);
 }
 
@@ -351,7 +442,7 @@ function do_block_client(){
 		document.macfilterForm.macfilter_list_x_0.value = clients[this.selectedClientOrder][2];
 	}
 	else{
-		document.macfilterForm.target = "";
+		document.macfilterForm.target = "applyFrame";
 		document.macfilterForm.action_mode.value = " Restart ";
 		document.macfilterForm.macfilter_list_x_0.disabled = true;
 	}
@@ -388,7 +479,7 @@ function done_validating(action, group_id){
 }
 
 function submit_macfilter(){
-	document.macfilterForm.target = "";
+	document.macfilterForm.target = "applyFrame";
 	document.macfilterForm.action_mode.value = " Restart ";
 	document.macfilterForm.next_page.value = location.pathname;
 	document.macfilterForm.submit();
@@ -453,6 +544,25 @@ function networkmap_update(s){
 
 <style>
     .table th, .table td{vertical-align: middle; text-align: center;}
+    .client-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px 24px;padding:20px 4px 16px;}
+    .client-heading{flex:1 1 290px;min-width:0;}
+    .client-heading h3{display:flex;align-items:center;gap:10px;margin:0;font-size:16px;font-weight:600;color:#26364d;}
+    .client-count{display:inline-flex;align-items:center;min-height:24px;padding:1px 9px;border-radius:6px;background:#edf4ff;color:#2465ba;font-size:12px;font-weight:500;}
+    .client-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+    .client-actions .btn{width:auto;min-width:88px;font-size:13px;}
+    .client-actions svg{width:16px;height:16px;flex:none;}
+    #refresh_list[data-loading="true"] svg{animation:client-refresh-spin .8s linear infinite;}
+    .client-refresh-feedback{display:flex;align-items:baseline;gap:7px;min-height:22px;margin-top:5px;color:#64748b;font-size:12px;line-height:1.65;}
+    .client-refresh-mark{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:currentColor;}
+    .client-refresh-feedback[data-state="loading"]{color:#2563eb;}
+    .client-refresh-feedback[data-state="loading"] .client-refresh-mark{width:12px;height:12px;box-sizing:border-box;background:transparent;border:2px solid #bfdbfe;border-top-color:#2563eb;animation:client-refresh-spin .8s linear infinite;}
+    .client-refresh-feedback[data-state="success"]{color:#15803d;}
+    .client-refresh-feedback[data-state="error"]{color:#b91c1c;}
+    .client-scan-notice{padding:9px 12px;margin:0 0 12px;border:1px solid #dce8fa;border-radius:8px;background:#f0f6ff;color:#395c87;font-size:12px;}
+    #Clients_table{margin-top:0;}
+    @keyframes client-refresh-spin{to{transform:rotate(360deg);}}
+    @media(max-width:600px){.client-toolbar{padding-top:14px;gap:10px;}.client-actions{width:100%;}.client-actions .btn{flex:1;padding:8px 10px;min-width:0;}.client-heading{flex-basis:100%;}}
+    @media(prefers-reduced-motion:reduce){.client-refresh-feedback[data-state="loading"] .client-refresh-mark,#refresh_list[data-loading="true"] svg{animation:none;}}
 </style>
 
 </head>
@@ -461,9 +571,6 @@ function networkmap_update(s){
 
 <iframe name="applyFrame" id="applyFrame" src="" width="0" height="0" frameborder="0" scrolling="no" style="position: absolute;"></iframe>
 
-<div id="LoadingBar" style="display: none; "><span class="label label-info"><#Device_Searching#></span>
-<!--[if lte IE 6.5]><iframe class="hackiframe"></iframe><![endif]-->
-</div>
 <div id="loadingBarBlock" class="loadingBarBlock" align="center" style="display: none;">
 </div>
 
@@ -483,17 +590,31 @@ function networkmap_update(s){
 
 <div id="unBlockedClients_table"></div>
 
+<div class="client-toolbar">
+    <div class="client-heading">
+        <h3><#ConnectedClient#><span id="client_count" class="client-count"></span></h3>
+        <div id="client_refresh_feedback" class="client-refresh-feedback" data-state="idle" role="status" aria-live="polite" aria-atomic="true" aria-busy="false">
+            <span class="client-refresh-mark" aria-hidden="true"></span>
+            <span id="client_refresh_message">正在载入设备列表…</span>
+        </div>
+    </div>
+    <div class="client-actions" role="group" aria-label="设备列表操作">
+        <button type="button" id="refresh_list" class="btn btn-primary" onclick="refresh_clients();"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 6.1A8 8 0 0 1 19.7 11M4.3 13a8 8 0 0 0 13.6 4.9"/></svg><span id="client_refresh_label">刷新列表</span></button>
+        <button type="button" id="scan_clients" class="btn" onclick="networkmap_update('networkmap_refresh');" title="主动探测整个局域网，需要等待扫描完成；扫描期间仍显示已知设备。">扫描新设备</button>
+        <button type="button" id="applyClient" class="btn" onclick="applyRule();"><#CTL_apply#></button>
+    </div>
+</div>
+<div id="LoadingBar" class="client-scan-notice" style="display:none;"><span><#Device_Searching#></span></div>
 <table id="Clients_table" width="100%" align="center" cellpadding="1" class="table">
+    <caption class="hide"><#ConnectedClient#></caption>
     <thead>
-        <tr>
-            <th colspan="6" style="text-align: center;"><#ConnectedClient#></th>
-        </tr>
         <tr>
             <th width="8%"><a href="javascript:sort(0)"><#Type#></a></th>
             <th><a href="javascript:sort(1)"><#Computer_Name#></a></th>
             <th width="20%"><a href="javascript:sort(2)">IP</a></th>
             <th width="24%"><a href="javascript:sort(3)">MAC</a></th>
             <th width="8%" id="col_rssi"><a href="javascript:sort(4)">RSSI</a></th>
+            <th>限速 (Mbps)</th>
             <th width="0%" id="col_block"></th>
         </tr>
     </thead>
@@ -505,7 +626,7 @@ function networkmap_update(s){
 <table id="xClients_table" width="100%" align="center" class="table">
     <thead>
         <tr>
-            <th colspan="6" style="text-align: center;"><#BlockedClient#></th>
+            <th colspan="7" style="text-align: center;"><#BlockedClient#></th>
         </tr>
         <tr>
             <th width="8%"><#Type#></th>
@@ -513,18 +634,13 @@ function networkmap_update(s){
             <th width="20%">IP</th>
             <th width="24%">MAC</th>
             <th width="8%" id="col_unrssi">RSSI</th>
+            <th>限速 (Mbps)</th>
             <th width="0%" id="col_unblock"></th>
         </tr>
     </thead>
     <tbody>
     </tbody>
 </table>
-
-<center>
-    <input type="button" id="applyClient" class="btn btn-primary span2" onclick="applyRule();" value="<#CTL_apply#>" />
-    <input type="button" id="refresh_list" class="btn btn-info span2" onclick="refresh_clients();" value="<#CTL_refresh#>" />
-    <input type="button" id="scan_clients" class="btn btn-info" onclick="networkmap_update('networkmap_refresh');" value="扫描新设备" title="主动探测整个局域网，通常需要十几秒；扫描期间仍显示已知设备。" />
-</center>
 
 <div id="alert_block" class="alert alert-danger" style="margin-top:40px; display: none;">
     <p><a href="/Advanced_MACFilter_Content.asp" target="_parent"><#menu5_5_3#></a> <#macfilter_alert_str1#></p>

@@ -821,7 +821,7 @@ function markGroupMDHCP(o, c, b) {
 			return false;
 		}else if (document.form.pppoemwan_mac_x_0.value==""){
 			alert("<#JS_fieldblank#>");
-			document.form.pppoemwan_mac_x.focus();
+			document.form.pppoemwan_mac_x_0.focus();
 			document.form.pppoemwan_mac_x_0.select();
 			return false;
 		}else if(document.form.pppoemwan_ip_x_0.value==""){
@@ -1326,17 +1326,19 @@ function simplyMAC(fullMAC){
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#PPP_LCP#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,7,29);"><#PPP_LCP#></a></th>
                                             <td>
                                                 <label class="radio inline"><input type="radio" value="1" name="wan_ppp_lcp" class="input" <% nvram_match_x("", "wan_ppp_lcp", "1", "checked"); %>><#checkbox_Yes#></label>
                                                 <label class="radio inline"><input type="radio" value="0" name="wan_ppp_lcp" class="input" <% nvram_match_x("", "wan_ppp_lcp", "0", "checked"); %>><#checkbox_No#></label>
+                                                <p class="help-block" style="margin: 8px 0 0;" id="wan_ppp_lcp_help"><#PPP_LCP_note#></p>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th><#PPP_AdaptiveLCP#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,7,30);"><#PPP_AdaptiveLCP#></a></th>
                                             <td>
                                                 <label class="radio inline"><input type="radio" value="1" name="wan_ppp_alcp" class="input" <% nvram_match_x("", "wan_ppp_alcp", "1", "checked"); %>><#checkbox_Yes#></label>
                                                 <label class="radio inline"><input type="radio" value="0" name="wan_ppp_alcp" class="input" <% nvram_match_x("", "wan_ppp_alcp", "0", "checked"); %>><#checkbox_No#></label>
+                                                <p class="help-block" style="margin: 8px 0 0;" id="wan_ppp_alcp_help"><#PPP_AdaptiveLCP_note#></p>
                                             </td>
                                         </tr>
                                         <tr id="row_pppoe_svc">

@@ -20,6 +20,7 @@ OBJS += net.o net_lan.o net_wan.o net_wifi.o net_ppp.o services_ex.o rstats.o
 OBJS += ralink.o gpio_pins.o detect_link.o detect_internet.o detect_wan.o
 OBJS += vpn_server.o vpn_client.o
 OBJS += gpio_btn.o btn_action.o
+OBJS += bandwidth.o
 ifeq ($(CONFIG_FIRMWARE_INCLUDE_OPENVPN),y)
 OBJS += vpn_openvpn.o
 endif

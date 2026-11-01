@@ -1708,6 +1708,12 @@ main(int argc, char **argv)
 	else if (!strcmp(base, "restart_firewall")) {
 		restart_firewall();
 	}
+	else if (!strcmp(base, "bandwidthctl")) {
+		if (argc > 1 && !strcmp(argv[1], "stop"))
+			stop_bandwidth_limits();
+		else
+			restart_bandwidth_limits();
+	}
 	else if (!strcmp(base, "radio2_toggle")) {
 		manual_toggle_radio_rt(-1);
 	}

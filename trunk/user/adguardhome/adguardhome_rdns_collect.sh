@@ -2,23 +2,23 @@
 # 收集名称发布结果和当前 LAN 前缀；只写 RAM 快照，不操作网络和服务。
 set -eu
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 state=/tmp/adguardhome-rdns
 lock=/tmp/adguardhome-hosts.lock
 renderer=/usr/bin/adguardhome_rdns_snapshot.awk
 [ -r "$renderer" ] || exit 1
 [ "$(nvram get adg_enable)" = 1 ] || exit 0
 [ ! -e /tmp/adguardhome-state/manual-stop ] || exit 0
-[ ! -d /tmp/.adguardhome_service_lock ] || exit 0
+lockdir_available /tmp/.adguardhome_service_lock || exit 0
 set -- $(pidof AdGuardHome || :)
 [ "$#" = 1 ] || exit 0
 pid=$1
 identity="$(cat /proc/sys/kernel/random/boot_id):$pid:$(awk '{print $22}' /proc/$pid/stat):$(stat -Lc '%d:%i' /proc/$pid/exe)"
 mkdir -p "$state"
-mkdir "$lock" 2>/dev/null || exit 0
-echo $$ > "$lock/pid"
+lockdir_take "$lock" 0 || exit 0
 work="$state/collect.$$"
-mkdir "$work" || { rm -f "$lock/pid"; rmdir "$lock"; exit 1; }
-cleanup() { rm -f "$work/"*; rmdir "$work"; rm -f "$lock/pid"; rmdir "$lock"; }
+mkdir "$work" || { lockdir_release "$lock"; exit 1; }
+cleanup() { rm -f "$work/"*; rmdir "$work"; lockdir_release "$lock"; }
 trap cleanup 0
 trap 'exit 1' 1 2 15
 : > "$work/tracked"

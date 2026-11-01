@@ -47,6 +47,17 @@ function initial(){
 	show_mmc_card();
 	show_middle_status();
 	show_client_status(ccount);
+	bind_status_frame_size();
+	['linkInternet', 'radioStatusLink', 'clientStatusLink'].forEach(function(id){
+		document.getElementById(id).addEventListener('click', function(e){
+			if(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+			// 只更新详情框，避免依赖浏览器对同名窗口的查找和重复导航。
+			e.preventDefault();
+			clickEvent(this.querySelector('.ui-map-symbol'));
+			var frame = document.getElementById('statusframe');
+			if(frame.getAttribute('src') !== this.getAttribute('href')) frame.src = this.getAttribute('href');
+		});
+	});
 	set_default_choice();
 
 	if (!support_2g_radio() && !support_5g_radio()) { // Remove radio row
@@ -57,6 +68,59 @@ function initial(){
 		$("linkInternet").href = "/device-map/intranet.asp"
 
 	update_internet_status();
+}
+
+// 详情内容会随设备数量和页面切换变化，不能继续使用固定高度截断操作区。
+function bind_status_frame_size(){
+	var frame = document.getElementById('statusframe');
+	var observer = null, changes = null, timer = null;
+	function fit(){
+		timer = null;
+		try {
+			var doc = frame.contentDocument;
+			if (!doc || !doc.body) return;
+			// 先解除旧高度，设备变少时也能收起；一次绘制前完成测量和恢复。
+			frame.style.height = '1px';
+			var height = Math.ceil(Math.max(doc.body.scrollHeight, doc.body.getBoundingClientRect().height, doc.documentElement.scrollHeight, 180)) + 2;
+			frame.style.height = height + 'px';
+			frame.setAttribute('scrolling', 'no');
+		} catch (e) {
+			// 异常或跨来源页面保留滚动，不能把剩余内容藏起来。
+			frame.style.height = '571px';
+			frame.setAttribute('scrolling', 'auto');
+		}
+	}
+	function schedule(){
+		if (timer === null) timer = window.setTimeout(fit, 0);
+	}
+	function watch(){
+		if (observer) observer.disconnect();
+		if (changes) changes.disconnect();
+		observer = changes = null;
+		try {
+			var doc = frame.contentDocument;
+			if (doc && doc.body) {
+				if (window.ResizeObserver) {
+					observer = new ResizeObserver(schedule);
+					observer.observe(doc.body);
+				} else if (window.MutationObserver) {
+					changes = new MutationObserver(schedule);
+					changes.observe(doc.body, {childList:true, subtree:true, attributes:true, characterData:true});
+				}
+			}
+		} catch (e) {}
+		schedule();
+	}
+	frame.addEventListener('load', watch);
+	window.addEventListener('resize', schedule);
+	window.addEventListener('pagehide', function(){
+		clearTimeout(timer);
+		timer = null;
+		if (observer) observer.disconnect();
+		if (changes) changes.disconnect();
+	});
+	window.addEventListener('pageshow', watch);
+	watch();
 }
 
 function detect_update_info(){
@@ -95,80 +159,41 @@ function set_default_choice(){
 		show_default_icon();
 }
 
-function showMapWANStatus(flag){
-	$j("#internetStatus").removeClass("badge badge-success badge-warning badge-important");
+function setMapState(rowId, state){
+	var row = document.getElementById(rowId);
+	if(row) row.setAttribute('data-state', state);
+}
 
-	if(flag == 1){
-		$j("#internetStatus").addClass("badge badge-success");
-		$j("#internetStatus").html('<i class="icon-ok icon-white"></i>');
-	}
-	else if(flag == 2){
-		$j("#internetStatus").addClass("badge badge-warning");
-		$j("#internetStatus").html('<i class="icon-minus icon-white"></i>');
-	}
-	else{
-		$j("#internetStatus").addClass("badge badge-important");
-		$j("#internetStatus").html('<i class="icon-remove icon-white"></i>');
-	}
+function showMapWANStatus(flag){
+	var state = flag === 1 ? 'online' : flag === 2 ? 'warning' : flag === 0 ? 'offline' : 'unknown';
+	var label = flag === 1 ? '已连接' : flag === 2 ? '正在检测' : flag === 0 ? '未连接' : '等待状态更新';
+	setMapState('row_internet', state);
+	document.getElementById('internetStatus').textContent = label;
+	document.getElementById('internetLabel').textContent = sw_mode == '3' ? '上级网络' : '互联网';
+	document.getElementById('linkInternet').setAttribute('aria-label', (sw_mode == '3' ? '上级网络' : '互联网') + '：' + label + '，查看详情');
 }
 
 function show_middle_status(){
-	var auth_mode = document.form.rt_auth_mode.value;
-	var wpa_mode = document.form.rt_wpa_mode.value;
-	var wl_wep_x = parseInt(document.form.rt_wep_x.value);
-	var security_mode;
-
-	if(auth_mode == "open")
-		security_mode = "Open System";
-	else if(auth_mode == "shared")
-		security_mode = "Shared Key";
-	else if(auth_mode == "psk"){
-		if(wpa_mode == "1")
-			security_mode = "WPA-Personal";
-		else if(wpa_mode == "2")
-			security_mode = "WPA2-Personal";
-		else if(wpa_mode == "0")
-			security_mode = "WPA-Auto-Personal";
-		else
-			alert("System error for showing auth_mode!");
-	}
-	else if(auth_mode == "wpa"){
-		if(wpa_mode == "3")
-			security_mode = "WPA-Enterprise";
-		else if(wpa_mode == "4")
-			security_mode = "WPA-Auto-Enterprise";
-		else
-			alert("System error for showing auth_mode!");
-	}
-	else if(auth_mode == "wpa2")
-		security_mode = "WPA2-Enterprise";
-	else if(auth_mode == "radius")
-		security_mode = "Radius with 802.1x";
-
-	//$("wl_securitylevel_span").innerHTML = security_mode;
-
-	if(auth_mode == "open" && wl_wep_x == 0) {
-		$j("#wl_securitylevel_span").addClass("badge badge-important");
-		$j("#wl_securitylevel_span").html('<i class="icon-exclamation-sign icon-white"></i>');
-	} else {
-		$j("#wl_securitylevel_span").addClass("badge badge-success");
-		$j("#wl_securitylevel_span").html('<i class="icon-lock icon-white"></i>');
-	}
+	var wifi = window.sysinfo || {}, hasTwo = support_2g_radio(), hasFive = support_5g_radio();
+	var known = (!hasTwo || wifi.wifi2) && (!hasFive || wifi.wifi5);
+	var two = known && hasTwo && Number(wifi.wifi2.state) > 0;
+	var five = known && hasFive && Number(wifi.wifi5.state) > 0;
+	var label = !known ? '等待状态更新' : two && five ? '双频已开启' : two ? '2.4 GHz 已开启' : five ? '5 GHz 已开启' : '无线已关闭';
+	setMapState('row_radio', !known ? 'unknown' : two || five ? 'online' : 'offline');
+	document.getElementById('radioStatus').textContent = label;
+	document.getElementById('radioStatusLink').setAttribute('aria-label', '无线网络：' + label + '，查看设置');
+	if(!support_2g_radio()) document.getElementById('radioStatusLink').href = '/device-map/router.asp';
 }
 
 function show_client_status(clients_count){
-	var client_str = "";
-	var wired_num = 0, wireless_num = 0;
-
-	client_str += "<#Full_Clients#>: <span>"+clients_count+"</span>";
-
-	$j("#clientNumber").addClass("badge badge-success");
-	if(clients_count < 10)
-		$j("#clientNumber").css({paddingLeft: '6px', paddingRight: '7px'});
-	else
-		$j("#clientNumber").css({paddingLeft: '3px', paddingRight: '4px'});
-
-	$j("#clientNumber").html(clients_count);
+	// 未取得计数时不显示在线；不同设备仍按原有设备列表分别统计。
+	var known = clients_count !== null && clients_count !== '' && /^\d+$/.test(String(clients_count));
+	var count = known ? Number(clients_count) : 0;
+	known = known && isFinite(count);
+	var label = known ? count + ' 台设备' : '等待状态更新';
+	setMapState('row_clients', !known ? 'unknown' : count > 0 ? 'online' : 'offline');
+	document.getElementById('clientNumber').textContent = label;
+	document.getElementById('clientStatusLink').setAttribute('aria-label', '已连接设备：' + label + '，查看列表');
 }
 
 function show_usb_ports(){
@@ -717,28 +742,35 @@ $j(document).ready(function(){
 
                             <table class="table table-big" aria-label="网络状态导航">
                                 <tbody>
-                                    <tr id="row_internet">
-                                        <td width="30%">
-                                            <a id="linkInternet" href="/device-map/internet.asp" target="statusframe" style="outline:0;">
-                                                <div id="iconInternet" class="big-icons big-icons-globe" onclick="clickEvent(this);"></div><span class="ui-map-label">互联网</span>
+                                    <tr id="row_internet" data-state="unknown">
+                                        <td>
+                                            <a id="linkInternet" class="ui-map-card" href="/device-map/internet.asp" target="statusframe">
+                                                <span id="iconInternet" class="big-icons big-icons-globe ui-map-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 6.5h14M5 17.5h14"/></svg></span>
+                                                <span class="ui-map-copy"><span id="internetLabel" class="ui-map-label">互联网</span><span id="internetStatus" class="ui-map-status" aria-live="polite">等待状态更新</span></span>
+                                                <span class="ui-map-chevron" aria-hidden="true">›</span>
                                             </a>
                                             <div id="overDiv" style="position:absolute; visibility:hidden; z-index:1000;"></div>
-                                            <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="internetStatus" style="padding-left: 3px;"></div></div>
-                                            <div class="arrow-right" id="arrow-internet"><img src="/bootstrap/img/arrow-right.png"></div>
+                                            <div class="arrow-right" id="arrow-internet"></div>
                                         </td>
                                     </tr>
-                                    <tr id="row_radio">
-                                        <td width="30%">
-                                            <a href="device-map/router2g.asp" target="statusframe" style="outline:0;"><div id="iconRouter" class="big-icons big-icons-router" onclick="clickEvent(this);"></div><span class="ui-map-label">无线网络</span></a>
-                                            <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><div id="wl_securitylevel_span" style="padding-right: 3px;"></div></div>
-                                            <div class="arrow-right" id="arrow-router"><img src="/bootstrap/img/arrow-right.png"></div>
-                                        </td>
-                                    </tr>
-                                    <tr>
+                                    <tr id="row_radio" data-state="unknown">
                                         <td>
-                                            <a id="clientStatusLink" href="device-map/clients.asp" target="statusframe" style="outline:0;"><div id="iconClient" class="big-icons big-icons-laptop" onclick="clickEvent(this);"></div><span class="ui-map-label">已连接设备</span></a>
-                                            <div style="position: absolute; margin-top: -47px; margin-left: 50px;"><b><div id="clientNumber">&nbsp;</div></b></div>
-                                            <div class="arrow-right" id="arrow-clients"><img src="/bootstrap/img/arrow-right.png"></div>
+                                            <a id="radioStatusLink" class="ui-map-card" href="/device-map/router2g.asp" target="statusframe">
+                                                <span id="iconRouter" class="big-icons big-icons-router ui-map-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a15.5 15.5 0 0 1 20 0M5 11.5a10.8 10.8 0 0 1 14 0M8.5 15a5.5 5.5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg></span>
+                                                <span class="ui-map-copy"><span class="ui-map-label">无线网络</span><span id="radioStatus" class="ui-map-status" aria-live="polite">等待状态更新</span></span>
+                                                <span class="ui-map-chevron" aria-hidden="true">›</span>
+                                            </a>
+                                            <div class="arrow-right" id="arrow-router"></div>
+                                        </td>
+                                    </tr>
+                                    <tr id="row_clients" data-state="unknown">
+                                        <td>
+                                            <a id="clientStatusLink" class="ui-map-card" href="/device-map/clients.asp" target="statusframe">
+                                                <span id="iconClient" class="big-icons big-icons-laptop ui-map-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="16" height="12" rx="1.5"/><path d="M14 15v5m-4 0h8"/><rect x="2" y="10" width="6" height="11" rx="1.2"/><path d="M4.5 18.5h1"/></svg></span>
+                                                <span class="ui-map-copy"><span class="ui-map-label">已连接设备</span><span id="clientNumber" class="ui-map-status" aria-live="polite">等待状态更新</span></span>
+                                                <span class="ui-map-chevron" aria-hidden="true">›</span>
+                                            </a>
+                                            <div class="arrow-right" id="arrow-clients"></div>
                                         </td>
                                     </tr>
                                     <tr id="row_usb_port1">

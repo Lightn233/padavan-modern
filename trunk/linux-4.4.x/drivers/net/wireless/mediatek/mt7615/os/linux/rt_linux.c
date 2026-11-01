@@ -1640,6 +1640,11 @@ void RtmpOSNetDevDetach(PNET_DEV pNetDev)
 #if (KERNEL_VERSION(2, 6, 31) <= LINUX_VERSION_CODE)
 	struct net_device_ops *pNetDevOps = (struct net_device_ops *)pNetDev->netdev_ops;
 #endif
+#ifdef CONFIG_RA_HW_NAT_WIFI_NEW_ARCH
+	/* Remove closed virtual interfaces from the hardware NAT table too. */
+	RT_MOD_HNAT_DEREG(pNetDev);
+#endif
+
 	unregister_netdevice(pNetDev);
 #if (KERNEL_VERSION(2, 6, 31) <= LINUX_VERSION_CODE)
 	vfree(pNetDevOps);

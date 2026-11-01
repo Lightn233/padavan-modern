@@ -1,4 +1,4 @@
-var helpcontent = new Array(25);
+var helpcontent = new Array(29);
 var help_enable = '<% nvram_get_x("", "help_enable"); %>';
 
 helpcontent[0] = new Array("");
@@ -64,8 +64,8 @@ helpcontent[7] = new Array("",
 				"<#vpn_passthrough_desc#>",
 				"<#vpn_passthrough_desc#>");
 // 静态使用说明放在对应标签的悬停帮助中，页面保留给设置和实际故障。
-helpcontent[7][23] += "<br><br>硬件 NAT 会绕过软件限速。使用自定义 QoS 前请关闭硬件 NAT；内置 SQM 启用期间会暂停硬件 NAT 和 shortcut-fe，保留这里的设置。";
-helpcontent[7][28] = "shortcut-fe 是软件转发加速。它可能绕过软件限速；使用自定义 QoS 前请关闭，内置 SQM 启用期间会暂时停用它，保留设置。硬件 NAT 与 shortcut-fe 同时开启时，不代表性能可以简单叠加。";
+helpcontent[7][23] += "<br><br><#HWNAT_Shaping_help#>";
+helpcontent[7][28] = "<#Shortcut_Shaping_help#>";
 //Firewall
 helpcontent[8] = new Array("",
 				"<#FirewallConfig_WanLanLog_itemdesc#>",
@@ -178,6 +178,16 @@ helpcontent[24] = new Array("",
 				"<#LANHostConfig_x_DDNSWildcard_itemdesc#>",
 				"<#LANHostConfig_x_DDNSStatus_itemdesc#>");
 
+
+// Plain-language help follows the behavior of rc/pppd, not inferred defaults.
+helpcontent[7][29] = "<#PPP_LCP_help#>";
+helpcontent[7][30] = "<#PPP_AdaptiveLCP_help#>";
+helpcontent[25] = new Array("", "<#InetCheckMode_help#>", "<#InetCheckHosts_help#>", "<#InetCheckPeriod_help#>", "<#InetCheckTimeout_help#>", "<#InetCheckLostDelay_help#>", "<#InetCheckLostAction_help#>", "<#InetCheckReconPause_help#>");
+helpcontent[26] = new Array("", "<#IP6_SVC_help#>", "<#IP6_WAN_IF_help#>", "<#IP6_WAN_DHCP_help#>", "<#IP6_LAN_Auto_help#>", "<#IP6_LAN_RAdv_help#>", "<#IP6_LAN_DHCP_help#>", "<#IP6_DNS_Auto_help#>");
+helpcontent[5][11] += "<br><br><#DHCP_MultiMAC_help#>";
+
+helpcontent[27] = new Array("", "<#SDNS_MinTTL_help#>", "<#SDNS_Prefetch_help#>", "<#SDNS_Persist_help#>", "<#SDNS_Expired_help#>", "<#SDNS_ExpiredTTL_help#>", "<#SDNS_ReplyTTL_help#>");
+helpcontent[28] = new Array("", "<#Adbyby_Mode_help#>", "<#Adbyby_AntiAD_help#>");
 
 function openTooltip(obj, hint_array_id, hint_show_id)
 {

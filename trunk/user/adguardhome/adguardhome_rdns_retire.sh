@@ -3,6 +3,7 @@
 # 没有动作适配器时只记录待清理地址，不停止任何服务。
 set -eu
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 state=$1
 manifest=$2
 action=${3:-}
@@ -15,13 +16,16 @@ case "$state" in /tmp/*|/home/*) ;; *) exit 2 ;; esac
 for number in "$now" "$debounce" "$cooldown"; do case "$number" in ''|*[!0-9]*) exit 2 ;; esac; done
 [ -s "$manifest" ] && [ "$(wc -c < "$manifest")" -le 65536 ] || exit 2
 mkdir -p "$state"
-mkdir "$state/tick.lock" 2>/dev/null || exit 0
+mkdir -p -m 700 "$state/tick.lock" || exit 1
+exec 8>>"$state/tick.lock/.lock"
+busybox flock -n 8 || exit 0
 work="$state/tick.lock"
 locked=0
 cleanup() {
-    if [ "$locked" = 1 ]; then rm -f "$service_lock/pid"; rmdir "$service_lock"; fi
+    if [ "$locked" = 1 ]; then lockdir_release "$service_lock"; fi
     rm -f "$work/"*
-    rmdir "$work"
+    # Keep the hidden lock inode; regular work files are removed above.
+    :
 }
 trap cleanup 0
 trap 'exit 1' 1 2 15
@@ -62,15 +66,14 @@ awk -v now="$now" -v delay="$debounce" 'now-$2>=delay {print $1}' "$state/pendin
 [ -n "$action" ] || { echo 'pending-observation-only'; exit 0; }
 case "$action" in /*) [ -x "$action" ] || exit 2 ;; *) exit 2 ;; esac
 for guard in manual-stop updating disabled unhealthy; do [ ! -e "$state/$guard" ] || exit 0; done
-[ ! -d "$names_lock" ] || exit 0
+lockdir_available "$names_lock" || exit 0
 last=$(cat "$state/last-attempt" 2>/dev/null || echo -1000000)
 [ $((now-last)) -ge "$cooldown" ] || exit 0
-mkdir "$service_lock" 2>/dev/null || exit 0
+lockdir_take "$service_lock" 0 || exit 0
 locked=1
-echo $$ > "$service_lock/pid"
 # 获锁后再检查；适配器还必须复核原进程、更新状态和实际服务健康。
 for guard in manual-stop updating disabled unhealthy; do [ ! -e "$state/$guard" ] || exit 0; done
-[ ! -d "$names_lock" ] || exit 0
+lockdir_available "$names_lock" || exit 0
 # 现机 BusyBox 未启用 cmp；校验输入摘要，读取失败时不执行动作。
 current_digest=$(sha256sum "$manifest" 2>/dev/null) || exit 0
 snapshot_digest=$(sha256sum "$work/input" 2>/dev/null) || exit 0

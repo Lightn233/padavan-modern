@@ -1,5 +1,6 @@
 #!/bin/sh
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 CONFIG_FILE=${ADG_CONFIG_FILE:-/etc/storage/AdGuardHome.yaml}
 STATE_DIR=${ADG_STATE_DIR:-/tmp/adguardhome-state}
 SAVE_SCRIPT=${ADG_SAVE_SCRIPT:-/sbin/mtd_storage.sh}
@@ -71,7 +72,7 @@ maintain_network()
         [ "$STATE_DIR" = /tmp/adguardhome-state ] || return 0
     [ "$(nvram get adg_enable)" = 1 ] || return 0
     [ -x /usr/bin/adguardhome.sh ] && [ -x /usr/bin/update_ipv6_hosts.sh ] || return 0
-    [ ! -d /tmp/.adguardhome_service_lock ] || return 0
+    lockdir_available /tmp/.adguardhome_service_lock || return 0
     [ ! -e "$STATE_DIR/manual-stop" ] || return 0
 
     # 前缀维护由监测进程发起，避免名称脚本在启动锁内递归启动服务。
@@ -164,9 +165,8 @@ maintain_update_backup()
         [ "$STATE_DIR" = /tmp/adguardhome-state ] || return 0
     # 备份核验与清理、回退共用服务锁，避免核验结果写回已经清理的目录。
     backup_lock=/tmp/.adguardhome_service_lock
-    mkdir "$backup_lock" 2>/dev/null || return 0
-    echo $$ > "$backup_lock/pid"
-    trap 'rm -f "$backup_lock/pid"; rmdir "$backup_lock" 2>/dev/null || :' 0
+    lockdir_take "$backup_lock" 0 || return 0
+    trap 'lockdir_release "$backup_lock"' 0
     trap 'exit 1' 1 2 15
     local update_root update_work update_exe update_candidate update_pid
     local update_hash update_running_hash update_previous update_key update_backup
@@ -279,7 +279,7 @@ maintain_update_backup()
         fi
         update_snapshot=$(md5sum "$update_check_conf" 2>/dev/null | cut -d' ' -f1)
         if [ "$update_snapshot" != "$update_config_hash" ] ||
-            ! "$update_backup/AdGuardHome" --config "$update_check_conf" \
+            ! busybox timeout -s KILL 30 "$update_backup/AdGuardHome" --config "$update_check_conf" \
                 --work-dir /tmp/AdGuardHome --check-config >/dev/null 2>&1; then
             rm -f "$update_candidate" "$update_check_conf"
             logger -t AdGuardHome '官方备份尚未通过配套配置检查，暂不标记可回退'
@@ -326,7 +326,7 @@ maintain_rdns()
     [ "$CONFIG_FILE" = /etc/storage/AdGuardHome.yaml ] &&
         [ "$STATE_DIR" = /tmp/adguardhome-state ] || return 0
     [ "$(nvram get adg_enable)" = 1 ] || return 0
-    [ ! -e "$STATE_DIR/manual-stop" ] && [ ! -d /tmp/.adguardhome_service_lock ] || return 0
+    [ ! -e "$STATE_DIR/manual-stop" ] && lockdir_available /tmp/.adguardhome_service_lock || return 0
     [ -x /usr/bin/adguardhome_rdns_collect.sh ] &&
         [ -x /usr/bin/adguardhome_rdns_retire.sh ] &&
         [ -x /usr/bin/adguardhome_rdns_restart.sh ] || return 0
@@ -340,9 +340,11 @@ maintain_rdns()
 
 daemon()
 {
-    mkdir "$STATE_DIR/daemon.lock" 2>/dev/null || return 1
+    mkdir -p -m 700 "$STATE_DIR/daemon.lock" || return 1
+    exec 8>>"$STATE_DIR/daemon.lock/.lock" || return 1
+    busybox flock -n 8 || return 1
     echo $$ > "$PID_FILE"
-    trap 'rm -f "$PID_FILE"; rmdir "$STATE_DIR/daemon.lock" 2>/dev/null' 0
+    trap 'rm -f "$PID_FILE"' 0
     trap 'exit 0' 1 2 15
     previous=''
     previous_addresses=''
@@ -378,9 +380,8 @@ daemon()
 case "$1" in
     start)
         running && exit 0
-        rm -f "$PID_FILE"
-        rmdir "$STATE_DIR/daemon.lock" 2>/dev/null
-        "$0" daemon >/dev/null 2>&1 &
+        # Only the process holding daemon.lock may publish/remove watcher.pid.
+        "$0" daemon 8>&- 9>&- >/dev/null 2>&1 &
         n=0
         while ! running && [ "$n" -lt 3 ]; do sleep 1; n=$((n+1)); done
         running

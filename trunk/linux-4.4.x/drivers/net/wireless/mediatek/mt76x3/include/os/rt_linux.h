@@ -159,13 +159,13 @@ typedef struct usb_ctrlrequest devctrlrequest;
 #else
 //for PC's PATH
 #define AP_PROFILE_PATH			"/etc/Wireless/RT2860AP/RT2860AP.dat"
-#endif
+#endif /* !CONFIG_FIRST_IF_MT7603E */
 #define AP_RTMP_FIRMWARE_FILE_NAME "/etc/Wireless/RT2860AP/RT2860AP.bin"
 
 #endif
 
 
-#define AP_DRIVER_VERSION			"4.1.2.0_20190222"
+#define AP_DRIVER_VERSION			"4.1.2.1-mao-patch1"
 #ifdef MULTIPLE_CARD_SUPPORT
 #define CARD_INFO_PATH			"/etc/Wireless/RT2860AP/RT2860APCard.dat"
 #endif /* MULTIPLE_CARD_SUPPORT */
@@ -321,6 +321,10 @@ struct iw_statistics *rt28xx_get_wireless_stats(
 #endif
 #endif /* DOT11_VHT_AC */
 #endif /* !LIMIT_GLOBAL_SW_QUEUE */
+#ifdef MAX_CONTINUOUS_TX_CNT
+#undef MAX_PACKETS_IN_QUEUE
+#define MAX_PACKETS_IN_QUEUE				8192/*1024*/
+#endif
 
 /***********************************************************************************
  *	OS signaling related constant definitions
@@ -1287,7 +1291,7 @@ do { \
 
 #ifdef CONFIG_RAETH
 #if !defined(CONFIG_RA_NAT_NONE)
-extern int (*ra_sw_nat_hook_tx)(VOID *skb, int gmac_no);
+extern int (*ra_sw_nat_hook_tx)(VOID *skb,int gmac_no);
 extern int (*ra_sw_nat_hook_rx)(VOID *skb);
 #ifdef CONFIG_RA_HW_NAT_WIFI_NEW_ARCH
 extern void (*ppe_dev_register_hook)(VOID  *dev);

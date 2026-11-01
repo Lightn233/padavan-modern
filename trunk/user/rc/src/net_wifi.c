@@ -452,6 +452,9 @@ start_wifi_ap_wl(int radio_on)
 			wif_control(IFNAME_5G_GUEST, 1);
 			br_add_del_if(IFNAME_BR, IFNAME_5G_GUEST, 1);
 			wif_control_m2u(1, IFNAME_5G_GUEST);
+		} else {
+			/* 配置重载关闭访客时，同时清理原来的网桥成员。 */
+			br_add_del_if(IFNAME_BR, IFNAME_5G_GUEST, 0);
 		}
 	}
 #endif
@@ -507,6 +510,9 @@ start_wifi_ap_rt(int radio_on)
 			wif_control(IFNAME_2G_GUEST, 1);
 			br_add_del_if(IFNAME_BR, IFNAME_2G_GUEST, 1);
 			wif_control_m2u(0, IFNAME_2G_GUEST);
+		} else {
+			/* 配置重载关闭访客时，同时清理原来的网桥成员。 */
+			br_add_del_if(IFNAME_BR, IFNAME_2G_GUEST, 0);
 		}
 	}
 #endif
@@ -689,7 +695,7 @@ reconnect_apcli(const char *ifname_apcli, int force)
 
 	if (get_apcli_sta_auto(is_aband)) {
 		if (is_aband) {
-#if defined (USE_WID_5G) && (USB_WID_5G==7615 || USE_WID_5G==7915)
+#if defined (USE_WID_5G) && (USE_WID_5G==7615 || USE_WID_5G==7915)
 			doSystem("iwpriv %s set %s=%d", ifname_apcli, "ApCliAutoConnect", 3);
 			logmessage(LOGNAME, "Set ApCliAutoConnect to 3");
 #else
@@ -697,7 +703,7 @@ reconnect_apcli(const char *ifname_apcli, int force)
 			logmessage(LOGNAME, "Set ApCliAutoConnect to 1");
 #endif
 		} else {
-#if defined (USE_WID_2G) && (USB_WID_2G==7615 || USE_WID_2G==7915)
+#if defined (USE_WID_2G) && (USE_WID_2G==7615 || USE_WID_2G==7915)
 			doSystem("iwpriv %s set %s=%d", ifname_apcli, "ApCliAutoConnect", 3);
 			logmessage(LOGNAME, "Set ApCliAutoConnect to 3");
 #else
@@ -1182,6 +1188,8 @@ restart_guest_lan_isolation(void)
 #endif
 
 	brport_set_param_int(rt_ifname_guest, "isolate_mode", bp_isolate);
+	/* 访客接口由定时计划启停时，同步应用或撤下总带宽限制。 */
+	restart_bandwidth_limits();
 
 	if (!is_ap_mode)
 		return;

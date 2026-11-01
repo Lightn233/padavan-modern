@@ -2,6 +2,7 @@
 # 同步 LAN 的 IPv4/IPv6 名称；沿用旧文件名以兼容已保存的配置。
 set -eu
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 HOSTS_FILE=${ADG_HOSTS_FILE:-/etc/storage/dnsmasq/hosts_ipv6}
 PTR_FILE=${ADG_PTR_FILE:-/etc/storage/dnsmasq/dnsmasq_ipv6_ptr}
 LEASES=${ADG_LEASES_FILE:-/tmp/dnsmasq.leases}
@@ -34,29 +35,19 @@ elif ! awk '$2=="/media/mtd_rwfs" && $3=="ubifs" && (","$4",") ~ /,rw,/ {found=1
     CACHE_SAVE=
 fi
 
-if ! mkdir "$LOCK" 2>/dev/null; then
-    owner=$(cat "$LOCK/pid" 2>/dev/null || :)
-    case "$owner" in
-        ''|*[!0-9]*) exit 1 ;;
-        *) kill -0 "$owner" 2>/dev/null && exit 0 ;;
-    esac
-    rm -f "$LOCK/pid"
-    rmdir "$LOCK" 2>/dev/null && mkdir "$LOCK" || exit 1
-fi
-echo $$ > "$LOCK/pid"
+# A stale pid file is harmless; kernel locks disappear when the owner exits.
+lockdir_take "$LOCK" 0 || exit 0
 work="/tmp/adguardhome-names.$$"
 # 固件的 BusyBox 未编入 mktemp，mkdir 负责拒绝复用已有目录。
 if ! mkdir "$work"; then
-    rm -f "$LOCK/pid"
-    rmdir "$LOCK" 2>/dev/null || :
+    lockdir_release "$LOCK"
     exit 1
 fi
 cleanup()
 {
     rm -f "$work/"*
     rmdir "$work" 2>/dev/null || :
-    rm -f "$LOCK/pid"
-    rmdir "$LOCK" 2>/dev/null || :
+    lockdir_release "$LOCK"
 }
 trap cleanup 0
 trap 'exit 1' 1 2 15

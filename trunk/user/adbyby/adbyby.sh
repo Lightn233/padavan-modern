@@ -227,7 +227,7 @@ address=/.snssdk.com/0.0.0.0
 address=/.douyin.com/0.0.0.0
 		EOF
 	fi
-	sed -i '/dnsmasq-adbyby/d' /etc/storage/dnsmasq/dnsmasq.conf
+	sed -i '/^conf-dir=\/etc\/storage\/dnsmasq-adbyby\.d$/d' /etc/storage/dnsmasq/dnsmasq.conf
 	cat >> /etc/storage/dnsmasq/dnsmasq.conf << EOF
 conf-dir=/etc/storage/dnsmasq-adbyby.d
 EOF
@@ -248,9 +248,9 @@ EOF
 
 del_dns()
 {
-	sed -i '/dnsmasq-adbyby/d' /etc/storage/dnsmasq/dnsmasq.conf
+	sed -i '/^conf-dir=\/etc\/storage\/dnsmasq-adbyby\.d$/d' /etc/storage/dnsmasq/dnsmasq.conf
 	#sed -i '/tvhosts/d' /etc/storage/dnsmasq/dnsmasq.conf
-	sed -i '/hosts/d' /etc/storage/dnsmasq/dnsmasq.conf
+	sed -i '/^addn-hosts=\/tmp\/adbyby\/hosts$/d' /etc/storage/dnsmasq/dnsmasq.conf
 	rm -f /tmp/dnsmasq.d/dnsmasq-adbyby.conf
 	rm -f /etc/storage/dnsmasq-adbyby.d/*
 	rm -f /tmp/adbyby_host.conf
@@ -367,7 +367,7 @@ rm -f /tmp/host.txt
 logger -t "adbyby" "正在对hosts文件进行去重处理."
 sort $PROG_PATH/hosts | uniq
 nvram set adbyby_hostsad=`grep -v '^!' $PROG_PATH/hosts | wc -l`
-sed -i '/hosts/d' /etc/storage/dnsmasq/dnsmasq.conf
+sed -i '/^addn-hosts=\/tmp\/adbyby\/hosts$/d' /etc/storage/dnsmasq/dnsmasq.conf
 cat >> /etc/storage/dnsmasq/dnsmasq.conf <<-EOF
 	addn-hosts=$PROG_PATH/hosts
 EOF

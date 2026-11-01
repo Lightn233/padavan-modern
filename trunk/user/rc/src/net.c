@@ -543,6 +543,8 @@ acceleration_qos_active(void)
 	/* 限速期间只停用运行中的加速，不改写用户保存的加速偏好。 */
 	if (access("/var/run/sqm/accel-block", F_OK) == 0)
 		return 1;
+	if (bandwidth_limits_requested())
+		return 1;
 #if defined(APP_SQM)
 	if (nvram_get_int("sqm_enable") == 1)
 		return 1;

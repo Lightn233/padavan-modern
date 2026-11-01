@@ -2217,5 +2217,8 @@ start_firewall_ex(void)
 	module_smart_unload("iptable_raw", 0);
 	module_smart_unload("iptable_mangle", 0);
 	module_smart_unload("ip6table_mangle", 0);
+
+	/* WAN 重连后保留按设备及访客的限速，避免依赖旧接口编号。 */
+	restart_bandwidth_limits();
 }
 

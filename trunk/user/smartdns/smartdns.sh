@@ -1,4 +1,11 @@
 #!/bin/sh
+umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
+# Serialize DNS configuration changes with AGH maintenance, including stop.
+smartdns_service_lock=/tmp/.adguardhome_service_lock
+lockdir_take "$smartdns_service_lock" 30 || exit 1
+trap 'lockdir_release "$smartdns_service_lock"' 0
+trap 'exit 1' 1 2 15
 
 action="$1"
 storage_Path="/etc/storage"
@@ -22,6 +29,8 @@ snds_ip_change=$(nvram get snds_ip_change)
 sdns_ipv6=$(nvram get sdns_ipv6)
 sdns_www=$(nvram get sdns_www)
 sdns_exp=$(nvram get sdns_exp)
+sdns_exp_ttl=$(nvram get sdns_exp_ttl)
+sdns_exp_ttl_max=$(nvram get sdns_exp_ttl_max)
 snds_redirect=$(nvram get snds_redirect)
 sdns_cache_persist=$(nvram get sdns_cache_persist)
 snds_cache=$(nvram get snds_cache)
@@ -60,10 +69,12 @@ dnsmasq_md5=$(md5sum  "$dnsmasq_Conf" | awk '{ print $1 }')
 Read_ini () {
 # 【读取上次成功启动时的端口等】
     if [ -s "$smartdns_Ini" ] ; then
+        smartdns_had_state=1
         hosts_type=$(sed -n '1p' $smartdns_Ini)
         snds_redirected=$(sed -n '2p' $smartdns_Ini)
         sdns_ported=$(sed -n '3p' $smartdns_Ini)
     else
+        smartdns_had_state=0
         hosts_type=0
         snds_redirected=0
         sdns_ported="$sdns_port"
@@ -96,7 +107,7 @@ Check_md5 () {
 
 Check_ss(){
     if [ -s /etc_ro/ss_ip.sh ] ; then
-        if [ $(nvram get ss_enable) = 1 ] && [ $(nvram get ss_run_mode) = "router" ] && [ $(nvram get pdnsd_enable) = 0 ] ; then
+        if [ "$(nvram get ss_enable)" = 1 ] && [ "$(nvram get ss_run_mode)" = "router" ] && [ "$(nvram get pdnsd_enable)" = 0 ] ; then
             logger -t "SmartDNS" "系统检测到SS模式为绕过大陆模式，并且启用了pdnsd,请先调整SS解析使用SmartDNS+手动配置模式！程序将退出。"
             nvram set sdns_enable=0
             exit 0
@@ -163,6 +174,17 @@ Get_sdns_conf () {
     fi
     if [ "$sdns_exp" -eq 1 ] && [ "$snds_cache" -gt 0 ] ;then
         echo "serve-expired yes" >> "$smartdns_tmp_Conf"
+        # The page already stores these two values; pass them to the core.
+        case "$sdns_exp_ttl" in
+            ''|*[!0-9]*) ;;
+            *) [ "${#sdns_exp_ttl}" -gt 9 ] || echo "serve-expired-ttl $sdns_exp_ttl" >> "$smartdns_tmp_Conf" ;;
+        esac
+        case "$sdns_exp_ttl_max" in
+            ''|*[!0-9]*) ;;
+            *) if [ "${#sdns_exp_ttl_max}" -le 9 ] && [ "$sdns_exp_ttl_max" -gt 0 ]; then
+                   echo "serve-expired-reply-ttl $sdns_exp_ttl_max" >> "$smartdns_tmp_Conf"
+               fi ;;
+        esac
     else
         echo "serve-expired no" >> "$smartdns_tmp_Conf"
     fi
@@ -256,25 +278,25 @@ Get_sdnse_conf () {
         ARGS_2="$ARGS_2 -no-speed-check"
     fi
     if [ -n "$sdnse_name" ] ; then
-        ARGS_2="$ARGS_2-group $sdnse_name"
+        ARGS_2="$ARGS_2 -group $sdnse_name"
     fi
     if [ "$sdnse_address" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-rule-addr"
+        ARGS_2="$ARGS_2 -no-rule-addr"
     fi
     if [ "$sdnse_ns" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-rule-nameserver"
+        ARGS_2="$ARGS_2 -no-rule-nameserver"
     fi
     if [ "$sdnse_ipset" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-rule-ipset"
+        ARGS_2="$ARGS_2 -no-rule-ipset"
     fi
     if [ "$sdnse_as" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-rule-soa"
+        ARGS_2="$ARGS_2 -no-rule-soa"
     fi
     if [ "$sdnse_ipc" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-dualstack-selection"
+        ARGS_2="$ARGS_2 -no-dualstack-selection"
     fi
     if [ "$sdnse_cache" = "1" ] ; then
-        ARGS_2="$ARGS_2-no-cache"
+        ARGS_2="$ARGS_2 -no-cache"
     fi
     if [ "$sdns_ipv6_server" = "1" ] ; then
         ADDR="[::]"
@@ -312,10 +334,10 @@ Check_ip_addr () {
 
 Change_adbyby () {
 # 【】
-    if [ "$adbyby_process"x != x ] && [ $(nvram get adbyby_enable) = 1 ] ; then
+    if [ "$adbyby_process"x != x ] && [ "$(nvram get adbyby_enable)" = 1 ] ; then
     case $sdns_enable in
     0)
-        if [ $(nvram get adbyby_add) = 1 ] && [ "$hosts_type" != "Dnsmasq" ]; then
+        if [ "$(nvram get adbyby_add)" = 1 ] && [ "$hosts_type" != "Dnsmasq" ]; then
             nvram set adbyby_add=0
             /usr/bin/adbyby.sh switch
             logger -t "SmartDNS" "DNS 去广告规则: SmartDNS ⇒ Dnsmasq"
@@ -324,7 +346,7 @@ Change_adbyby () {
         ;;
     1)
         if [ "$hosts_type" != "SmartDNS" ] && [ "$action" = "start" ] ; then
-            if [ "$sdns_port" = "53" ] || [ $(nvram get adbyby_add) = 1 ] || [ "$snds_redirect" = "2" ] ; then
+            if [ "$sdns_port" = "53" ] || [ "$(nvram get adbyby_add)" = 1 ] || [ "$snds_redirect" = "2" ] ; then
                 nvram set adbyby_add=1
                 /usr/bin/adbyby.sh switch
                 logger -t "SmartDNS" "DNS 去广告规则: Dnsmasq ⇒ SmartDNS"
@@ -338,37 +360,61 @@ Change_adbyby () {
 
 
 Change_dnsmasq () {
-    # 删除 dnsmasq 配置文件中的相关项，避免重复
-    case $action in
-    stop)
-        sed -i '/no-resolv/d' "$dnsmasq_Conf"
-        sed -i '/server=127.0.0.1#'"$sdns_ported"'/d' "$dnsmasq_Conf"
-        sed -i '/port=0/d' "$dnsmasq_Conf"
-        if [ "$sdns_enable" = 0 ] ; then
-            [ "$sdns_ported" = "53" ] && logger -t "SmartDNS" "已启用 dnsmasq 域名解析（DNS）功能" 
-            [ "$snds_redirected" = "1" ] && logger -t "SmartDNS" "删除 dnsmasq 上游服务器：127.0.0.1:$sdns_ported" 
+    local pending legacy_port legacy_redirect legacy_dns53 redirect
+    pending="$dnsmasq_Conf.smartdns.$$"
+    legacy_port=''; legacy_redirect=0; legacy_dns53=0
+    if [ "${smartdns_had_state:-0}" = 1 ]; then
+        case "$sdns_ported" in
+            ''|*[!0-9]*) ;;
+            *) if [ "$sdns_ported" -ge 1 ] && [ "$sdns_ported" -le 65535 ]; then
+                   legacy_port=$sdns_ported
+                   [ "$snds_redirected" != 1 ] || legacy_redirect=1
+                   [ "$sdns_ported" != 53 ] || legacy_dns53=1
+               fi ;;
+        esac
+    fi
+    [ -f "$dnsmasq_Conf" ] || : > "$dnsmasq_Conf" || return 1
+    cp -p "$dnsmasq_Conf" "$pending" || { rm -f "$pending"; return 1; }
+    # Remove our marked block, or the adjacent legacy pair proven by saved
+    # SmartDNS state. Keep AGH/other managed blocks and all unrelated directives.
+    if ! awk -v port="$legacy_port" -v redirect="$legacy_redirect" -v dns53="$legacy_dns53" '
+      function flush() {if(held) print previous; held=0}
+      /^# BEGIN SmartDNS forward$/ {flush(); if(owned) bad=1; owned=1; next}
+      /^# END SmartDNS forward$/ {if(!owned) bad=1; owned=0; next}
+      owned {next}
+      /^# BEGIN / {flush(); protected++; print; next}
+      /^# END / {flush(); if(protected) protected--; print; next}
+      protected {flush(); print; next}
+      /^no-resolv$/ {flush(); previous=$0; held=1; next}
+      redirect && held && $0=="server=127.0.0.1#"port {held=0; next}
+      {flush(); if(dns53 && $0=="port=0") next; print}
+      END {flush(); if(owned || bad) exit 1}
+    ' "$dnsmasq_Conf" > "$pending"; then
+        rm -f "$pending"
+        return 1
+    fi
+    if [ "$action" = start ]; then
+        redirect=$snds_redirect
+        [ "$sdns_port" != 53 ] || redirect=0
+        if [ "$sdns_port" = 53 ] || [ "$redirect" = 1 ]; then
+            {
+                echo '# BEGIN SmartDNS forward'
+                if [ "$sdns_port" = 53 ]; then echo 'port=0';
+                else echo 'no-resolv'; echo "server=127.0.0.1#$sdns_port"; fi
+                echo '# END SmartDNS forward'
+            } >> "$pending" || { rm -f "$pending"; return 1; }
         fi
-        ;;
-    start)
-        # 启动 SmartDNS 时
-        if [ "$sdns_port" = "53" ] ; then
-            echo "port=0" >> "$dnsmasq_Conf"
-            logger -t "SmartDNS" "已关闭 dnsmasq 域名解析（DNS）功能"
-            if [ "$snds_redirect" = "1" ] ; then
-                nvram set snds_redirect=0
-                snds_redirect=0
-                logger -t "SmartDNS" "因此，自动修改 重定向为：无" 
-            fi
-        fi
-        if [ "$snds_redirect" = "1" ] ; then
-            echo "no-resolv" >> "$dnsmasq_Conf"
-            echo "server=127.0.0.1#$sdns_port" >> "$dnsmasq_Conf"
-            logger -t "SmartDNS" "作为 dnsmasq 上游服务器：127.0.0.1:$sdns_port"
-        fi
-        ;;
-    esac
+    fi
+    if ! mv "$pending" "$dnsmasq_Conf"; then
+        rm -f "$pending"
+        return 1
+    fi
+    if [ "$action" = start ] && [ "$sdns_port" = 53 ] && [ "$snds_redirect" = 1 ]; then
+        nvram set snds_redirect=0
+        snds_redirect=0
+        logger -t SmartDNS '监听 53 端口，由 SmartDNS 提供 DNS；关闭重复转发'
+    fi
 }
-
 
 
 Change_iptable () {
@@ -412,12 +458,28 @@ Change_iptable () {
     fi
 }
 
+stop_smartdns_process()
+{
+    local stop_attempt=0
+    pidof smartdns >/dev/null 2>&1 || return 0
+    # Permit the core to flush its persistent cache on normal shutdown.
+    killall -q smartdns || return 1
+    while pidof smartdns >/dev/null 2>&1; do
+        if [ "$stop_attempt" -ge 5 ]; then
+            killall -q -9 smartdns
+            return $?
+        fi
+        sleep 1
+        stop_attempt=$((stop_attempt+1))
+    done
+}
+
 Start_smartdns () {
     # 【】
-    :>"$smartdns_Ini"
-    [ "$sdns_enable" -eq 0 ] && nvram set sdns_enable=1 && sdns_enable=1
-    [ $(pidof smartdns | awk '{ print $1 }')x != x ] && killall -9 smartdns >/dev/null 2>&1
-    Change_dnsmasq
+    [ "$sdns_enable" = 0 ] && nvram set sdns_enable=1 && sdns_enable=1
+    Change_dnsmasq || return 1
+    : > "$smartdns_Ini" || return 1
+    stop_smartdns_process || return 1
     Change_adbyby
     echo "$hosts_type" >> "$smartdns_Ini"
     [ "$snds_redirect" = 0 ] && logger -t "SmartDNS" "SmartDNS 使用 $sdns_port 端口"
@@ -427,7 +489,7 @@ Start_smartdns () {
     echo "$sdns_port" >> "$smartdns_Ini"
     #存疑
     rm -f /tmp/sdnsipset.conf
-    args=""
+    set --
     logger -t "SmartDNS" "创建配置文件..."
     ipset -N smartdns hash:net >/dev/null
     Get_sdns_conf
@@ -441,14 +503,14 @@ Start_smartdns () {
     awk '!x[$0]++' "$smartdns_tmp_Conf" > "$smartdns_Conf"
     rm -f "$smartdns_tmp_Conf"
     if [ "$sdns_coredump" = "1" ] ; then
-        args="$args -S"
+        set -- -S
     fi
     # 通过检测配置文件是否变化，确定是否重启 dnsmasq 进程
     if [ "$dnsmasq_md5" != $(md5sum  "$dnsmasq_Conf" | awk '{ print $1 }') ] ; then
          /sbin/restart_dhcpd >/dev/null 2>&1
     fi
     # 启动 smartdns 进程
-    "$smartdns_Bin" -f -c "$smartdns_Conf" "$args"  &>/dev/null &
+    "$smartdns_Bin" -f -c "$smartdns_Conf" "$@" 8>&- 9>&- >/dev/null 2>&1 &
     sleep 1
     smartdns_process=$(pidof smartdns | awk '{ print $1 }')
     if [ "$smartdns_process"x = x ] ; then
@@ -457,7 +519,7 @@ Start_smartdns () {
             logger -t "SmartDNS" "删除"$smartdns_Conf"中conf-file附加去广告设置，再次启动......"
             logger -t "SmartDNS" "若启动成功，则请检查相关去广告规则格式是否符合SmartDNS要求"
             sed -i '/conf-file /d' "$smartdns_Conf"
-            "$smartdns_Bin" -f -c "$smartdns_Conf" "$args"  &>/dev/null &
+            "$smartdns_Bin" -f -c "$smartdns_Conf" "$@" 8>&- 9>&- >/dev/null 2>&1 &
         fi
     fi
     sleep 1
@@ -473,7 +535,7 @@ Start_smartdns () {
         if [ "$dnsmasq_md5" != $(md5sum  "$dnsmasq_Conf" | awk '{ print $1 }') ] ; then
              /sbin/restart_dhcpd >/dev/null 2>&1
         fi
-        exit
+        return 1
     else
         logger -t "SmartDNS" "smartdns 进程已启动"
     fi
@@ -481,21 +543,19 @@ Start_smartdns () {
 
 
 Stop_smartdns () {
-    # 【】
-    killall -9 smartdns >/dev/null 2>&1
-    # 未接管过 DNS 时，停止操作不能删除其他服务的 dnsmasq 配置。
-    [ -s "$smartdns_Ini" ] || return 0
-    logger -t "SmartDNS" "结束smartdns进程 ．．．"
-    Change_adbyby
-    Change_dnsmasq
-    Change_iptable
-    if [ "$dnsmasq_md5" != $(md5sum  "$dnsmasq_Conf" | awk '{ print $1 }') ] && [ "$sdns_enable" = 0 ] ; then
-         /sbin/restart_dhcpd >/dev/null 2>&1
+    # Remove forwarding successfully before stopping its resolver.
+    if [ -s "$smartdns_Ini" ] || grep -Fxq '# BEGIN SmartDNS forward' "$dnsmasq_Conf"; then
+        Change_dnsmasq || return 1
+        Change_adbyby
+        Change_iptable
+        if [ "$dnsmasq_md5" != "$(md5sum "$dnsmasq_Conf" | awk '{ print $1 }')" ] && [ "$sdns_enable" = 0 ]; then
+            /sbin/restart_dhcpd >/dev/null 2>&1 || return 1
+        fi
     fi
-    smartdns_process=$(pidof smartdns | awk '{ print $1 }')
-    if [ "$smartdns_process"x = x ] && [ "$sdns_enable" = 0 ] ; then 
-        rm  -f "$smartdns_Ini"
-        logger -t "SmartDNS" "已停用"
+    stop_smartdns_process || return 1
+    if [ "$sdns_enable" = 0 ]; then
+        rm -f "$smartdns_Ini"
+        logger -t SmartDNS '已停用'
     fi
 }
 
@@ -508,7 +568,7 @@ Main () {
             logger -t "SmartDNS" "启动．．．"
         fi
         Check_ss
-        Start_smartdns
+        Start_smartdns || return 1
         logger -t "SmartDNS" "已成功启动"
         ;;
     stop)
@@ -525,14 +585,17 @@ Main () {
         Stop_smartdns
         ;;
     restart)
-        if [ $(nvram get adbyby_enable) = 1 ] ; then
-            [ $(nvram get adbyby_add) = 1 ] && hosts_type="SmartDNS"
-            [ $(nvram get adbyby_add) = 0 ] && hosts_type="Dnsmasq"
+        action=stop
+        Stop_smartdns || return 1
+        action=start
+        if [ "$(nvram get adbyby_enable)" = 1 ] ; then
+            [ "$(nvram get adbyby_add)" = 1 ] && hosts_type="SmartDNS"
+            [ "$(nvram get adbyby_add)" = 0 ] && hosts_type="Dnsmasq"
         else
             hosts_type="0"
         fi
         Check_ss
-        Start_smartdns
+        Start_smartdns || return 1
         logger -t "SmartDNS" "已完成重启"
         ;;
     reset)

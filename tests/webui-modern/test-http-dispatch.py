@@ -35,7 +35,7 @@ static time_t tdate_parse(char *p){(void)p;return 0;}
 static void send_error(int s,const char *a,const char *b,const char *d,FILE *f){(void)a;(void)b;(void)d;(void)f;status=s;}
 static void send_headers(int s,const char *a,const char *b,const char *d,struct stat *st,FILE *f){(void)a;(void)b;(void)d;(void)st;(void)f;status=s;}
 static int auth_check(const char *s){auth_calls++;return s!=NULL;}
-static void send_authenticate(FILE *f){(void)f;status=401;}
+static void send_authenticate(FILE *f,...){(void)f;status=401;}
 static void http_logout(const uaddr *a){(void)a;}
 static void http_login(const uaddr *a){(void)a;}
 static void eat_post_data(FILE *f,int n){(void)f;(void)n;}
@@ -63,9 +63,9 @@ static void trial(const char *label,int locked,const char *method){
 int main(void){trial("no_active_login",0,"GET");trial("different_active_login_GET",1,"GET");trial("different_active_login_POST",1,"POST");return 0;}
 '''
 if a.candidate:
-    code=code.replace('auth_calls==0&&output_calls==1&&status==200','auth_calls==0&&input_calls==0&&output_calls==0&&status==403')
+    code=code.replace('auth_calls==0&&output_calls==1&&status==200','auth_calls==1&&input_calls==0&&output_calls==0&&status==401')
     code=code.replace('return s!=NULL;', 'return s && strcspn(s,"\\r\\n")==strlen("Basic dGVzdDp0ZXN0") && !strncmp(s,"Basic dGVzdDp0ZXN0",strlen("Basic dGVzdDp0ZXN0"));')
-    code=code.replace('{"audit.json","application/json",NULL,mock_input,mock_output,1},', '{"audit.json","application/json",NULL,mock_input,mock_output,1},\n {"public.js","text/javascript",NULL,NULL,mock_output,0},')
+    code=code.replace('{"audit.json","application/json",NULL,mock_input,mock_output,1},', '{"audit.json","application/json",NULL,mock_input,mock_output,1},\n {"index.asp","text/html",NULL,NULL,do_ej,1},\n {"public.js","text/javascript",NULL,NULL,mock_output,0},')
     extra=r'''
 static void normal_case(const char *label,int owner,int client,const char *method,const char *path,const char *auth,int expected_status,int expected_auth,int expected_input,int expected_output){
  char request[512];snprintf(request,sizeof(request),"%s /%s HTTP/1.0\r\n%sContent-Length: 0\r\n\r\n",method,path,auth);
@@ -83,9 +83,9 @@ static void normal_cases(void){
  normal_case("valid_same_client_post",123,123,"POST","audit.json",good,200,1,1,1);
  normal_case("same_client_missing_auth",123,123,"GET","audit.json","",401,1,0,0);
  normal_case("same_client_wrong_auth",123,123,"GET","audit.json","Authorization: Basic wrong\r\n",401,1,0,0);
- normal_case("different_client_with_auth",456,123,"GET","audit.json",good,403,0,0,0);
+ normal_case("different_client_with_auth",456,123,"GET","audit.json",good,403,1,0,0);
  normal_case("public_resource_foreign_login",456,123,"GET","public.js","",200,0,0,1);
- normal_case("occupied_page_still_visible",456,123,"GET","index.asp","",200,0,0,0);
+ normal_case("occupied_page_requires_auth",456,123,"GET","index.asp","",401,1,0,0);
  normal_case("localhost_behavior_preserved",456,0,"GET","audit.json","",200,0,0,1);
 }
 '''

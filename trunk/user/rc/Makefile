@@ -32,6 +32,7 @@ romfs:
 	$(LN) rc $(ROMFSDIR)/sbin/restart_vpn_client
 	$(LN) rc $(ROMFSDIR)/sbin/run_telnetd
 	$(LN) rc $(ROMFSDIR)/sbin/restart_firewall
+	$(LN) rc $(ROMFSDIR)/sbin/bandwidthctl
 	$(LN) rc $(ROMFSDIR)/sbin/pids
 	$(LN) rc $(ROMFSDIR)/sbin/rstats
 	$(LN) rc $(ROMFSDIR)/sbin/stop_wan

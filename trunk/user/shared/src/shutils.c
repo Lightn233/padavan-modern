@@ -56,23 +56,44 @@
 static char *
 fd2str(int fd, size_t chunk_size)
 {
-	char *buf = NULL;
-	size_t count = 0, n;
+	char *buf = NULL, *next;
+	size_t count = 0;
+	ssize_t n;
+	int saved_errno;
 
-	do {
-		buf = realloc(buf, count + chunk_size);
-		n = read(fd, buf + count, chunk_size);
-		if (n < 0) {
-			free(buf);
-			buf = NULL;
+	if (!chunk_size) {
+		errno = EINVAL;
+		goto fail;
+	}
+	for (;;) {
+		/* Include the terminator, even after a full or short read. */
+		if (chunk_size > (size_t)-1 - count - 1) {
+			errno = EOVERFLOW;
+			goto fail;
 		}
-		count += n;
-	} while (n == chunk_size);
-
+		next = realloc(buf, count + chunk_size + 1);
+		if (!next)
+			goto fail;
+		buf = next;
+		do {
+			n = read(fd, buf + count, chunk_size);
+		} while (n < 0 && errno == EINTR);
+		if (n < 0)
+			goto fail;
+		count += (size_t)n;
+		if (n == 0)
+			break;
+	}
+	buf[count] = '\0';
 	close(fd);
-	if (buf)
-		buf[count] = '\0';
 	return buf;
+
+fail:
+	saved_errno = errno;
+	free(buf);
+	close(fd);
+	errno = saved_errno;
+	return NULL;
 }
 
 /*

@@ -118,6 +118,7 @@ static long g_store_cntr = 0;
 static volatile sig_atomic_t gothup = 0;
 static volatile sig_atomic_t gotusr1 = 0;
 static volatile sig_atomic_t gotusr2 = 0;
+static volatile sig_atomic_t gotterm = 0;
 
 // ===========================================
 
@@ -642,9 +643,8 @@ static void catch_sig_rstats(int sig)
 {
 	switch (sig) {
 	case SIGTERM:
-		save_history_raw(0);
-		free_rstats();
-		exit(0);
+		/* 只记录退出请求，避免在信号中打断采样后操作堆和文件流。 */
+		gotterm = 1;
 		break;
 	case SIGHUP:
 		gothup = 1;
@@ -668,7 +668,10 @@ int rstats_main(int argc, char *argv[])
 	FILE *fp;
 	pid_t pid;
 	struct sigaction sa;
+	sigset_t wait_signals, previous_mask;
+	struct timespec timeout;
 	long z;
+	int sig, result = 0;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = catch_sig_rstats;
@@ -715,28 +718,49 @@ int rstats_main(int argc, char *argv[])
 	g_uptime_now = z;
 	g_uptime_old = z;
 
-	while (1) {
-		while (g_uptime_now < z) {
-			sleep(z - g_uptime_now);
-			if (gothup) {
-				setenv_tz();
-				gothup = 0;
-			}
-			if (gotusr1) {
-				save_speed_json(z - uptime());
-				gotusr1 = 0;
-			}
-			if (gotusr2) {
-				save_history_json(z - uptime());
-				gotusr2 = 0;
-			}
-			g_uptime_now = uptime();
-		}
-		process_rstats();
-		z += RSTATS_INTERVAL;
+	/* 同步消费阻塞的信号，避免检查标志与进入等待之间丢掉唤醒。 */
+	sigemptyset(&wait_signals);
+	sigaddset(&wait_signals, SIGTERM);
+	sigaddset(&wait_signals, SIGHUP);
+	sigaddset(&wait_signals, SIGUSR1);
+	sigaddset(&wait_signals, SIGUSR2);
+	if (sigprocmask(SIG_BLOCK, &wait_signals, &previous_mask) < 0) {
+		free_rstats();
+		return 1;
 	}
-
+	while (!gotterm) {
+		g_uptime_now = uptime();
+		if (gothup) {
+			setenv_tz();
+			gothup = 0;
+		}
+		if (gotusr1) {
+			save_speed_json(z - g_uptime_now);
+			gotusr1 = 0;
+		}
+		if (gotusr2) {
+			save_history_json(z - g_uptime_now);
+			gotusr2 = 0;
+		}
+		if (g_uptime_now >= z) {
+			process_rstats();
+			z = g_uptime_old + RSTATS_INTERVAL;
+			continue;
+		}
+		timeout.tv_sec = z - g_uptime_now;
+		timeout.tv_nsec = 0;
+		sig = sigtimedwait(&wait_signals, NULL, &timeout);
+		if (sig > 0)
+			catch_sig_rstats(sig);
+		else if (errno != EAGAIN && errno != EINTR) {
+			perror("rstats sigtimedwait");
+			result = 1;
+			break;
+		}
+	}
+	save_history_raw(0);
 	free_rstats();
+	sigprocmask(SIG_SETMASK, &previous_mask, NULL);
 
-	return 0;
+	return result;
 }

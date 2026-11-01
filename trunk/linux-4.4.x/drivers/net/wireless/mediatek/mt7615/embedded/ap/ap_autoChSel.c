@@ -2594,10 +2594,10 @@ VOID AutoChSelBuildChannelListFor5G(
 			pACSChList[ChIdx].Bw = BW_40;
 
 			/* Check that if there is a secondary channel in current BW40-channel group for BW40 capacity. */
-			if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_ABOVE)
+			if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_ABOVE) && (ChIdx + 1 < ChListNum5G)
 				&& (pACSChList[ChIdx + 1].Channel == (pACSChList[ChIdx].Channel + 4)))
 				pACSChList[ChIdx].BwCap = TRUE;
-			else if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_BELOW)
+			else if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_BELOW) && (ChIdx > 0)
 				&& (pACSChList[ChIdx - 1].Channel == (pACSChList[ChIdx].Channel - 4)))
 				pACSChList[ChIdx].BwCap = TRUE;
 			else {
@@ -2613,10 +2613,10 @@ VOID AutoChSelBuildChannelListFor5G(
 			/* Check that whether there is a skip-channel in current BW40-channel group */
 			/* If there is a skip-channel in BW40-channel group, just also skip secondary channel */
 			if (pACSChList[ChIdx].SkipChannel == TRUE) {
-				if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_ABOVE)
+				if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_ABOVE) && (ChIdx + 1 < ChListNum5G)
 					&& (pACSChList[ChIdx + 1].Channel == (pACSChList[ChIdx].Channel + 4)))
 					pACSChList[ChIdx + 1].SkipChannel = TRUE;
-				else if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_BELOW)
+				else if ((GetABandChOffset(pACSChList[ChIdx].Channel) == EXT_BELOW) && (ChIdx > 0)
 					&& (pACSChList[ChIdx - 1].Channel == (pACSChList[ChIdx].Channel - 4)))
 					pACSChList[ChIdx - 1].SkipChannel = TRUE;
 			}
@@ -2646,11 +2646,11 @@ VOID AutoChSelBuildChannelListFor5G(
 			if (vht_ch_80M[idx].ch_up_bnd != 0) {
 				/* Count for secondary channels in current VHT BW80 channel group */
 				for (k = 1; k < 4; k++) {
-					if ((pACSChList[ChIdx + k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
+					if ((ChIdx + k < ChListNum5G) && (pACSChList[ChIdx + k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx + k].Channel <= vht_ch_80M[idx].ch_up_bnd))
 						count++;
 
-					if ((pACSChList[ChIdx - k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
+					if ((ChIdx >= k) && (pACSChList[ChIdx - k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx - k].Channel <= vht_ch_80M[idx].ch_up_bnd))
 						count++;
 				}
@@ -2666,11 +2666,11 @@ VOID AutoChSelBuildChannelListFor5G(
 			/* If there is a skip-channel in BW80-channel group, just also skip secondary channels */
 			if (pACSChList[ChIdx].SkipChannel == TRUE) {
 				for (k = 1; k < 4; k++) {
-					if ((pACSChList[ChIdx + k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
+					if ((ChIdx + k < ChListNum5G) && (pACSChList[ChIdx + k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx + k].Channel <= vht_ch_80M[idx].ch_up_bnd))
 						pACSChList[ChIdx + k].SkipChannel = TRUE;
 
-					if ((pACSChList[ChIdx - k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
+					if ((ChIdx >= k) && (pACSChList[ChIdx - k].Channel >= vht_ch_80M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx - k].Channel <= vht_ch_80M[idx].ch_up_bnd))
 						pACSChList[ChIdx - k].SkipChannel = TRUE;
 				}
@@ -2695,11 +2695,11 @@ VOID AutoChSelBuildChannelListFor5G(
 			if (vht_ch_160M[idx].ch_up_bnd != 0) {
 				/* Count for secondary channels in current VHT BW160 channel group */
 				for (k = 1; k < 8; k++) {
-					if ((pACSChList[ChIdx + k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
+					if ((ChIdx + k < ChListNum5G) && (pACSChList[ChIdx + k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx + k].Channel <= vht_ch_160M[idx].ch_up_bnd))
 						count++;
 
-					if ((pACSChList[ChIdx - k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
+					if ((ChIdx >= k) && (pACSChList[ChIdx - k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx - k].Channel <= vht_ch_160M[idx].ch_up_bnd))
 						count++;
 				}
@@ -2712,11 +2712,11 @@ VOID AutoChSelBuildChannelListFor5G(
 			/* If there is a skip-channel in BW160-channel group, just also skip secondary channels */
 			if (pACSChList[ChIdx].SkipChannel == TRUE) {
 				for (k = 1; k < 8; k++) {
-					if ((pACSChList[ChIdx + k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
+					if ((ChIdx + k < ChListNum5G) && (pACSChList[ChIdx + k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx + k].Channel <= vht_ch_160M[idx].ch_up_bnd))
 						pACSChList[ChIdx + k].SkipChannel = TRUE;
 
-					if ((pACSChList[ChIdx - k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
+					if ((ChIdx >= k) && (pACSChList[ChIdx - k].Channel >= vht_ch_160M[idx].ch_low_bnd) &&
 						(pACSChList[ChIdx - k].Channel <= vht_ch_160M[idx].ch_up_bnd))
 						pACSChList[ChIdx - k].SkipChannel = TRUE;
 				}

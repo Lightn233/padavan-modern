@@ -21,6 +21,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <limits.h>
 
 #include <httpd.h>
 
@@ -241,57 +242,64 @@ int
 load_dictionary(char *lang, pkw_t pkw)
 {
 	FILE *dfp;
-	char dfn[16];
-	char *p, *q;
-	int res, dict_size = 0;
+	char dfn[16], *line, *next;
+	long file_size;
+	size_t bytes, capacity = 1, i;
+	kw_t loaded;
 
 	if (!pkw)
 		return 0;
-
-	snprintf(dfn, sizeof (dfn), "%s.dict", lang);
+	memset(&loaded, 0, sizeof(loaded));
+	snprintf(dfn, sizeof(dfn), "%s.dict", lang);
 	dfp = fopen(dfn, "r");
 	if (!dfp)
 		return 0;
-
-	memset(pkw, 0, sizeof(kw_t));
-
-	fseek(dfp, 0L, SEEK_END);
-	dict_size = ftell(dfp) + 128;
-
-	pkw->buf = malloc(dict_size);
-	if (!pkw->buf) {
-		fclose(dfp);
-		return 0;
+	if (fseek(dfp, 0, SEEK_END) != 0 || (file_size = ftell(dfp)) < 0 ||
+	    file_size >= INT_MAX || fseek(dfp, 0, SEEK_SET) != 0)
+		goto fail;
+	loaded.buf = malloc((size_t)file_size + 1);
+	if (!loaded.buf)
+		goto fail;
+	bytes = fread(loaded.buf, 1, (size_t)file_size, dfp);
+	if (bytes != (size_t)file_size || ferror(dfp) || memchr(loaded.buf, 0, bytes))
+		goto fail;
+	loaded.buf[bytes] = '\0';
+	for (i = 0; i < bytes; i++)
+		if (loaded.buf[i] == '\n')
+			capacity++;
+	if (capacity > (size_t)INT_MAX || capacity > (size_t)-1 / sizeof(*loaded.idx))
+		goto fail;
+	loaded.idx = malloc(capacity * sizeof(*loaded.idx));
+	if (!loaded.idx)
+		goto fail;
+	loaded.tlen = (int)capacity;
+	line = (char *)loaded.buf;
+	while (line) {
+		size_t len;
+		next = strchr(line, '\n');
+		if (next)
+			*next++ = '\0';
+		len = strlen(line);
+		if (len && line[len - 1] == '\r')
+			line[len - 1] = '\0';
+		if (strchr(line, '=')) {
+			if (loaded.len >= loaded.tlen)
+				goto fail;
+			loaded.idx[loaded.len++] = (unsigned char *)line;
+		}
+		line = next;
 	}
-
-	snprintf(pkw->dict, sizeof(pkw->dict), "%s", lang);
-	REALLOC_VECTOR (pkw->idx, pkw->len, pkw->tlen, sizeof (unsigned char*));
-
-	fseek(dfp, 0L, SEEK_SET);
-
-	q = pkw->buf;
-
-	while ((res = fscanf(dfp, "%[^\n]", q)) != EOF) {
-		fgetc(dfp);
-		
-		if (res < 1)
-			continue;
-		
-		p = strchr(q, '=');
-		if (!p)
-			continue;
-		
-		REALLOC_VECTOR (pkw->idx, pkw->len, pkw->tlen, sizeof (unsigned char*));
-		pkw->idx[pkw->len] = q;
-		pkw->len++;
-		q = p + strlen(p);
-		*q = '\0';
-		q++;
-	}
-
+	snprintf(loaded.dict, sizeof(loaded.dict), "%s", lang);
 	fclose(dfp);
-
+	release_dictionary(pkw);
+	*pkw = loaded;
 	return 1;
+
+fail:
+	free(loaded.idx);
+	free(loaded.buf);
+	fclose(dfp);
+	return 0;
 }
 
 // This translation engine can not process <%...%> interlace with <#...#>
@@ -305,7 +313,7 @@ do_ej(const char *url, FILE *stream)
 	int pattern_size = MAX_PATTERN_LENGTH - RESERVE_SIZE;
 	char pat_buf[MAX_PATTERN_LENGTH];
 	char *pattern = pat_buf, *asp = NULL, *asp_end = NULL, *key = NULL, *key_end = NULL;
-	char *start_pat, *end_pat, *lang;
+	char *start_pat = pat_buf, *end_pat = pat_buf, *lang;
 	pkw_t pkw = &kw_EN;
 	int conn_break = 0;
 	size_t ret, read_len, len;
@@ -331,7 +339,6 @@ do_ej(const char *url, FILE *stream)
 	if (pkw->buf)
 		no_translate = 0;
 
-	start_pat = end_pat = pattern;
 	memset (pattern + pattern_size, 0, 4);
 	while (conn_break == 0)
 	{
@@ -341,7 +348,7 @@ do_ej(const char *url, FILE *stream)
 		if (((pattern + pattern_size) - end_pat) < frag_size)
 		{
 			len = end_pat - start_pat;
-			memcpy (pattern, start_pat, len);
+			memmove (pattern, start_pat, len);
 			start_pat = pattern;
 			end_pat = start_pat + len;
 			*end_pat = '\0';
@@ -463,8 +470,7 @@ do_ej(const char *url, FILE *stream)
 
 	fclose(fp);
 
-	if (pattern != pat_buf)
-		free (pattern);
+	/* pattern always points to the local pat_buf; no heap allocation. */
 
 	fflush(stream);
 }

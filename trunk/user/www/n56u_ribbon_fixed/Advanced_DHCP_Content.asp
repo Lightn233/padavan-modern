@@ -292,12 +292,7 @@ function markGroupMDHCP(o, c, b) {
 					document.form.dhcp_staticmac_x_0.select();
 					return false;
 				}
-				if(document.form.dhcp_staticip_x_0.value.value==m_dhcp[i][1]) {
-					alert('<#JS_duplicate#>' + ' (' + m_dhcp[i][1] + ')' );
-					document.form.dhcp_staticip_x_0.focus();
-					document.form.dhcp_staticip_x_0.select();
-					return false;
-				}
+				// Multiple MACs may share one IP; services_ex.c groups them.
 			}
 		}
 	}

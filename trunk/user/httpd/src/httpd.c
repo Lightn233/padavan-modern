@@ -639,16 +639,35 @@ send_error( int status, const char *title, const char *extra_header, const char 
 }
 
 static void
-send_authenticate( FILE *conn_fp )
+send_authenticate( FILE *conn_fp, int rejected, int head_only )
 {
-	char header[128], *realm;
+	char header[256], *realm;
 
 	realm = nvram_safe_get("computer_name");
 	if (strlen(realm) < 1)
 		realm = nvram_safe_get("productid");
 
-	snprintf(header, sizeof(header), "WWW-Authenticate: Basic realm=\"%s\"", realm);
-	send_error( 401, "Unauthorized", header, "Authorization required.", conn_fp );
+	snprintf(header, sizeof(header), "WWW-Authenticate: Basic realm=\"%.128s\"\r\nCache-Control: no-store", realm);
+	/* 保留浏览器的 HTTP 登录入口；取消或失败时也提供可读的说明。 */
+	send_headers(401, "Unauthorized", header, "text/html; charset=utf-8", NULL, conn_fp);
+	if (head_only)
+		return;
+	fputs("<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
+	      "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+	      "<title>需要登录路由器</title><style>"
+	      "body{margin:0;background:#f3f6fa;color:#172b43;font:15px/1.7 system-ui,sans-serif}"
+	      "main{box-sizing:border-box;width:min(440px,calc(100% - 32px));margin:12vh auto;"
+	      "padding:28px;background:#fff;border:1px solid #dde5ef;border-radius:16px}"
+	      "h1{font-size:22px;margin:0 0 12px}p{color:#53677e}"
+	      "a{display:block;background:#2368df;color:#fff;border-radius:8px;padding:10px;"
+	      "text-align:center;text-decoration:none;margin-top:24px}"
+	      "a:focus-visible{outline:3px solid #91b9ff;outline-offset:3px}"
+	      "</style></head><body><main><h1>", conn_fp);
+	fputs(rejected ? "用户名或密码不正确" : "请登录路由器", conn_fp);
+	fputs("</h1><p>请在浏览器的登录窗口中输入管理账号和密码。"
+	      "如果浏览器保存了错误密码，请重新填写或更新保存的密码。</p>"
+	      "<a href=\"/\">重新登录</a></main></body></html>", conn_fp);
+	fflush(conn_fp);
 }
 
 static int
@@ -1001,14 +1020,6 @@ handle_request(FILE *conn_fp, const conn_item_t *item)
 
 	login_state = http_login_check(&conn_ip);
 	
-	if (login_state == 0) {
-		if (strstr(file, ".htm") != NULL || strstr(file, ".asp") != NULL) {
-			file = "Nologin.asp";
-			query = NULL;
-		}
-	}
-	
-
 	/* special case for reset browser credentials */
 	if (strcmp(file, "logout") == 0) {
 		send_headers( 401, "Unauthorized", NULL, NULL, NULL, conn_fp );
@@ -1031,26 +1042,42 @@ handle_request(FILE *conn_fp, const conn_item_t *item)
 
 	do_logout = (strcmp(file, "Logout.asp") == 0) ? 1 : 0;
 
-	/* 其他管理地址占用会话时，API 同样拒绝；只允许显示原有占用提示页。 */
-	if (handler->need_auth && login_state == 0 && strcmp(file, "Nologin.asp") != 0) {
-		if (method_id == HTTP_METHOD_POST)
-			eat_post_data(conn_fp, clen);
-		send_error(403, "Forbidden", NULL, "Another administrator is logged in.", conn_fp);
-		return;
-	}
-
-	if (handler->need_auth && login_state > 1 && !do_logout) {
+	/* 先验证凭据，再判断会话占用，避免错误密码也显示已登录设备地址。 */
+	if (handler->need_auth && login_state != 1 && (!do_logout || login_state == 0)) {
 		if (!auth_check(authorization)) {
 			http_logout(&conn_ip);
 			if (method_id == HTTP_METHOD_POST)
 				eat_post_data(conn_fp, clen);
-			send_authenticate(conn_fp);
+			send_authenticate(conn_fp, authorization != NULL, method_id == HTTP_METHOD_HEAD);
 			return;
 		}
-		
-		if (login_state == 2)
-			http_login(&conn_ip);
 	}
+
+	if (handler->need_auth && login_state == 0) {
+		if (method_id == HTTP_METHOD_POST)
+			eat_post_data(conn_fp, clen);
+		/* 页面返回明确的占用提示；接口和表单不得进入输入、输出处理函数。 */
+		if (method_id != HTTP_METHOD_POST &&
+		    (strstr(file, ".htm") != NULL || strstr(file, ".asp") != NULL)) {
+			for (handler = mime_handlers; handler->pattern; handler++) {
+				if (match(handler->pattern, "Nologin.asp"))
+					break;
+			}
+			if (handler->pattern && handler->output == do_ej) {
+				do_cgi_clear();
+				send_headers(403, "Forbidden", handler->extra_header,
+				             handler->mime_type, NULL, conn_fp);
+				if (method_id != HTTP_METHOD_HEAD)
+					handler->output("Nologin.asp", conn_fp);
+				return;
+			}
+		}
+		send_error(403, "Forbidden", NULL, "Another administrator is logged in.", conn_fp);
+		return;
+	}
+
+	if (handler->need_auth && login_state == 2 && !do_logout)
+		http_login(&conn_ip);
 
 	if (method_id == HTTP_METHOD_POST) {
 		if (handler->input)

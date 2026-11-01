@@ -307,8 +307,8 @@ function markGroupRULES(o, c, b) {
 			return false;
 		}else if(document.form.adbybyrules_road_x_0.value==""){
 			alert("<#JS_fieldblank#>");
-			document.form.adbybyrules_road_0.focus();
-			document.form.adbybyrules_road_0.select();
+			document.form.adbybyrules_road_x_0.focus();
+			// This field is a select control, not a text input.
 			return false;
 		}else{
 			for(i=0; i<m_rules.length; i++){
@@ -320,8 +320,8 @@ function markGroupRULES(o, c, b) {
 				}
 				if(document.form.adbybyrules_road_x_0.value.value==m_rules[i][1]) {
 					alert('<#JS_duplicate#>' + ' (' + m_rules[i][1] + ')' );
-					document.form.adbybyrules_road_0.focus();
-					document.form.adbybyrules_road_0.select();
+					document.form.adbybyrules_road_x_0.focus();
+					// This field is a select control, not a text input.
 					return false;
 				}
 			}
@@ -490,7 +490,7 @@ function changeBgColorrl(obj, num){
 										</tr>
 										<tr>
 											<th width="50%">
-											<a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this, 0, 1);">过滤方案选择:</a></th>
+											<a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this,28,1);" onclick="openTooltip(this,28,1);return false;">过滤方案选择:</a></th>
 											<td>
 												<select name="adbyby_set" class="input">
 													<option value="0" <% nvram_match_x("","adbyby_set", "0","selected"); %>>全局模式，过滤效果最强，但可能造成网络卡顿</option>
@@ -547,7 +547,7 @@ function changeBgColorrl(obj, num){
 										</tr>
 										<tr>
 											<th width="50%">
-											<a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this, 2, 1);">加载anti-AD项目规则:</a></th>
+											<a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this,28,2);" onclick="openTooltip(this,28,2);return false;">加载anti-AD项目规则:</a></th>
 											<td>
 													<div class="main_itoggle">
 													<div id="anti_ad_on_of">

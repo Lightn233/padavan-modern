@@ -23,6 +23,7 @@
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
+<script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 
@@ -416,7 +417,7 @@ function change_ip6_lan_dhcp(){
 
                                     <table width="100%" align="center" cellpadding="4" cellspacing="0" class="table" id="tbl_ip6_con">
                                         <tr>
-                                            <th width="50%"><#IP6_SVC#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,1);"><#IP6_SVC#></a></th>
                                             <td align="left">
                                                 <select class="input" name="ip6_service" onchange="change_ip6_service()" >
                                                     <option value="" <% nvram_match_x("", "ip6_service", "", "selected"); %>><#btn_Disabled#></option>
@@ -429,7 +430,7 @@ function change_ip6_lan_dhcp(){
                                             </td>
                                         </tr>
                                         <tr id="row_wan_if">
-                                            <th><#IP6_WAN_IF#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,2);"><#IP6_WAN_IF#></a></th>
                                             <td align="left">
                                                 <select class="input" name="ip6_wan_if" style="width: 130px;" >
                                                     <option value="0" <% nvram_match_x("", "ip6_wan_if", "0", "selected"); %>>WAN (ppp0)</option>
@@ -490,7 +491,7 @@ function change_ip6_lan_dhcp(){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#IP6_WAN_desc#></th>
                                         </tr>
                                         <tr id="row_ip6_wan_dhcp">
-                                            <th width="50%"><#IP6_WAN_DHCP#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,3);"><#IP6_WAN_DHCP#></a></th>
                                             <td align="left">
                                                 <select class="input" name="ip6_wan_dhcp" onchange="change_ip6_wan_dhcp()">
                                                     <option value="0" <% nvram_match_x("", "ip6_wan_dhcp", "0", "selected"); %>>Stateless: RA</option>
@@ -542,7 +543,7 @@ function change_ip6_lan_dhcp(){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#IP6_DNS_desc#></th>
                                         </tr>
                                         <tr id="row_ip6_dns_auto">
-                                            <th width="50%"><#IP6_DNS_Auto#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,7);"><#IP6_DNS_Auto#></a></th>
                                             <td>
                                                 <div class="main_itoggle">
                                                     <div id="ip6_dns_auto_on_of">
@@ -581,7 +582,7 @@ function change_ip6_lan_dhcp(){
                                             <th colspan="2" style="background-color: #E3E3E3;"><#IP6_LAN_desc#></th>
                                         </tr>
                                         <tr id="row_ip6_lan_auto">
-                                            <th width="50%"><#IP6_LAN_Auto#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,4);"><#IP6_LAN_Auto#></a></th>
                                             <td>
                                                 <div class="main_itoggle">
                                                     <div id="ip6_lan_auto_on_of">
@@ -608,7 +609,7 @@ function change_ip6_lan_dhcp(){
                                             </td>
                                         </tr>
                                         <tr>
-                                            <th width="50%"><#IP6_LAN_RAdv#></th>
+                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,5);"><#IP6_LAN_RAdv#></a></th>
                                             <td>
                                                 <div class="main_itoggle">
                                                     <div id="ip6_lan_radv_on_of">
@@ -623,13 +624,13 @@ function change_ip6_lan_dhcp(){
                                             </td>
                                         </tr>
                                         <tr id="row_ip6_lan_dhcp">
-                                            <th><#IP6_LAN_DHCP#></th>
+                                            <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,26,6);"><#IP6_LAN_DHCP#></a></th>
                                             <td align="left">
                                                 <select class="input" name="ip6_lan_dhcp" onchange="change_ip6_lan_dhcp()">
                                                     <option value="0" <% nvram_match_x("", "ip6_lan_dhcp", "0", "selected"); %>><#checkbox_No#></option>
-                                                    <option value="1" <% nvram_match_x("", "ip6_lan_dhcp", "1", "selected"); %>>Stateless (*)</option>
-                                                    <option value="2" <% nvram_match_x("", "ip6_lan_dhcp", "2", "selected"); %>>Stateful</option>
-                                                    <option value="3" <% nvram_match_x("", "ip6_lan_dhcp", "3", "selected"); %>>Stateless & Stateful</option>
+                                                    <option value="1" <% nvram_match_x("", "ip6_lan_dhcp", "1", "selected"); %>><#IP6_StateLess#> (*)</option>
+                                                    <option value="2" <% nvram_match_x("", "ip6_lan_dhcp", "2", "selected"); %>><#IP6_StateFul#></option>
+                                                    <option value="3" <% nvram_match_x("", "ip6_lan_dhcp", "3", "selected"); %>><#IP6_StateBoth#></option>
                                                 </select>
                                             </td>
                                         </tr>

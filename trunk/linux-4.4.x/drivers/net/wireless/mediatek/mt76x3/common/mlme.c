@@ -1861,8 +1861,9 @@ NTSTATUS MlmePeriodicExec(IN PRTMP_ADAPTER pAd, IN PCmdQElmt CMDQelmt)
 				badNodeDetect(pAd);
 #endif
 #endif
-
-
+#ifdef MAX_CONTINUOUS_TX_CNT
+		periodic_detect_tx_pkts(pAd); /* 100ms detect*/
+#endif
 	/* by default, execute every 500ms */
 	if ((pAd->ra_interval) && 
 		((pAd->Mlme.PeriodicRound % (pAd->ra_interval / 100)) == 0))
@@ -1892,6 +1893,9 @@ NTSTATUS MlmePeriodicExec(IN PRTMP_ADAPTER pAd, IN PCmdQElmt CMDQelmt)
 		 }
 #endif /* CONFIG_AP_SUPPORT */
 
+#ifdef MAP_SUPPORT
+	map_rssi_status_check(pAd);
+#endif
 
 
 
@@ -2737,8 +2741,7 @@ VOID MlmeUpdateTxRates(RTMP_ADAPTER *pAd, BOOLEAN bLinkUp, UCHAR apidx)
 		/* Keep Basic Mlme Rate.*/
 		pAd->MacTab.Content[MCAST_WCID].HTPhyMode.word = pAd->CommonCfg.MlmeTransmit.word;
 		if (pAd->CommonCfg.MlmeTransmit.field.MODE == MODE_OFDM)
-			/* MTK patch fix dhcp issue on new Apple and others buggy clients (use RATE_6 instead of 24) */
-			pAd->MacTab.Content[MCAST_WCID].HTPhyMode.field.MCS = OfdmRateToRxwiMCS[RATE_6];
+			pAd->MacTab.Content[MCAST_WCID].HTPhyMode.field.MCS = OfdmRateToRxwiMCS[RATE_24];
 		else
 			pAd->MacTab.Content[MCAST_WCID].HTPhyMode.field.MCS = RATE_1;
 		pAd->CommonCfg.BasicMlmeRate = pAd->CommonCfg.MlmeRate;
@@ -3333,6 +3336,11 @@ VOID BssEntrySet(
 		pBss->VarIELen = 0;
 	}
 
+#ifdef MAP_SUPPORT
+	pBss->map_vendor_ie_found = ie_list->vendor_ie.map_vendor_ie_found;
+	if (pBss->map_vendor_ie_found)
+		NdisMoveMemory(&pBss->map_info, &ie_list->vendor_ie.map_info, sizeof(struct map_vendor_ie));
+#endif
 
 	pBss->AddHtInfoLen = 0;
 	pBss->HtCapabilityLen = 0;
@@ -3615,6 +3623,88 @@ ULONG BssTableSetEntry(
 }
 
 
+#if defined(CONFIG_STA_SUPPORT) || defined(APCLI_SUPPORT)
+#ifdef DOT11_N_SUPPORT
+#ifdef DOT11N_DRAFT3
+VOID  TriEventInit(RTMP_ADAPTER *pAd) 
+{
+	UCHAR i;
+
+	for (i = 0;i < MAX_TRIGGER_EVENT;i++)
+		pAd->CommonCfg.TriggerEventTab.EventA[i].bValid = FALSE;
+	
+	pAd->CommonCfg.TriggerEventTab.EventANo = 0;
+	pAd->CommonCfg.TriggerEventTab.EventBCountDown = 0;
+}
+
+
+INT TriEventTableSetEntry(
+	IN RTMP_ADAPTER *pAd, 
+	OUT TRIGGER_EVENT_TAB *Tab, 
+	IN UCHAR *pBssid, 
+	IN HT_CAPABILITY_IE *pHtCapability,
+	IN UCHAR HtCapabilityLen,
+	IN UCHAR RegClass,
+	IN UCHAR ChannelNo)
+{
+	/* Event A, legacy AP exist.*/
+	if (HtCapabilityLen == 0)
+	{
+		UCHAR index;
+		
+		/*
+			Check if we already set this entry in the Event Table.
+		*/
+		for (index = 0; index<MAX_TRIGGER_EVENT; index++)
+		{
+			if ((Tab->EventA[index].bValid == TRUE) && 
+				(Tab->EventA[index].Channel == ChannelNo) && 
+				(Tab->EventA[index].RegClass == RegClass)
+			)
+			{
+				return 0;
+			}
+		}
+		
+		/*
+			If not set, add it to the Event table
+		*/
+		if (Tab->EventANo < MAX_TRIGGER_EVENT)
+		{
+			RTMPMoveMemory(Tab->EventA[Tab->EventANo].BSSID, pBssid, 6);
+			Tab->EventA[Tab->EventANo].bValid = TRUE;
+			Tab->EventA[Tab->EventANo].Channel = ChannelNo;
+			if (RegClass != 0)
+			{
+				/* Beacon has Regulatory class IE. So use beacon's*/
+				Tab->EventA[Tab->EventANo].RegClass = RegClass;
+			}
+			else
+			{
+				/* Use Station's Regulatory class instead.*/
+				/* If no Reg Class in Beacon, set to "unknown"*/
+				/* TODO:  Need to check if this's valid*/
+				Tab->EventA[Tab->EventANo].RegClass = 0; /* ????????????????? need to check*/
+			}
+			Tab->EventANo ++;
+		}
+	}
+#ifdef DOT11V_WNM_SUPPORT
+	/* Not complete yet. Ignore for compliing successfully.*/
+#else
+	else if (pHtCapability->HtCapInfo.Forty_Mhz_Intolerant == 0)
+	{
+		/* Event B.   My BSS beacon has Intolerant40 bit set*/
+		Tab->EventBCountDown = pAd->CommonCfg.Dot11BssWidthChanTranDelay;
+	}
+#endif /* DOT11V_WNM_SUPPORT */
+
+	return 0;
+}
+#endif /* DOT11N_DRAFT3 */
+#endif /* DOT11_N_SUPPORT */
+
+#endif
 
 #if (defined(CONFIG_STA_SUPPORT) || defined(WH_EZ_SETUP))
 UCHAR wmode_2_rfic(UCHAR PhyMode)
@@ -5707,17 +5797,17 @@ CHAR RTMPMaxRssi(RTMP_ADAPTER *pAd, CHAR Rssi0, CHAR Rssi1, CHAR Rssi2)
 {
 	CHAR	larger = -127;
 	
-	if ((pAd->Antenna.field.RxPath == 1) && (Rssi0 <= 0))
+	if ((pAd->Antenna.field.RxPath == 1) && (Rssi0 != 0))
 	{
 		larger = Rssi0;
 	}
 
-	if ((pAd->Antenna.field.RxPath >= 2) && (Rssi1 <= 0))
+	if ((pAd->Antenna.field.RxPath >= 2) && (Rssi1 != 0))
 	{
 		larger = max(Rssi0, Rssi1);
 	}
 	
-	if ((pAd->Antenna.field.RxPath == 3) && (Rssi2 <= 0))
+	if ((pAd->Antenna.field.RxPath == 3) && (Rssi2 != 0))
 	{
 		larger = max(larger, Rssi2);
 	}
@@ -5732,17 +5822,17 @@ CHAR RTMPMinRssi(RTMP_ADAPTER *pAd, CHAR Rssi0, CHAR Rssi1, CHAR Rssi2)
 {
 	CHAR	smaller = -127;
 
-	if ((pAd->Antenna.field.RxPath == 1) && (Rssi0 <= 0))
+	if ((pAd->Antenna.field.RxPath == 1) && (Rssi0 != 0))
 	{
 		smaller = Rssi0;
 	}
 
-	if ((pAd->Antenna.field.RxPath >= 2) && (Rssi1 <= 0))
+	if ((pAd->Antenna.field.RxPath >= 2) && (Rssi1 != 0))
 	{
 		smaller = min(Rssi0, Rssi1);
 	}
 	
-	if ((pAd->Antenna.field.RxPath == 3) && (Rssi2 <= 0))
+	if ((pAd->Antenna.field.RxPath == 3) && (Rssi2 != 0))
 	{
 		smaller = min(smaller, Rssi2);
 	}

@@ -21,7 +21,7 @@ trap 'exit 1' HUP INT TERM
 for d in "$BASE" "$DIR" "$RUNROOT" "$RUN"; do [ ! -L "$d" ] || fail '数据目录不能是符号链接'; done
 mkdir -p "$RUN";chmod 700 "$RUN"
 exec 9>"$RUN/lock"
-flock -n 9 || fail '已有同一核心的管理操作正在执行'
+busybox flock -n 9 || fail '已有同一核心的管理操作正在执行'
 case "$NAME" in
 sing-box)
     VERSION=1.14.4;ARCHIVE=sing-box-1.14.4-linux-mipsle-softfloat.tar.gz
@@ -47,8 +47,8 @@ runbin() { if [ -n "${OPTIONAL_NET_RUNNER:-}" ]; then "$OPTIONAL_NET_RUNNER" "$@
 uptime_seconds() { read -r service_uptime service_idle < /proc/uptime;printf '%s\n' "${service_uptime%%.*}"; }
 timed_check() {
     # 旧机型 BusyBox 使用 -t，当前版本与 GNU 使用位置参数；管理锁只由父进程持有。
-    help=$(timeout --help 2>&1 || :)
-    case "$help" in *'[-t SECS]'*) set -- timeout -s KILL -t 30 "$@";; *) set -- timeout -s KILL 30 "$@";; esac
+    help=$(busybox timeout --help 2>&1 || :)
+    case "$help" in *'[-t SECS]'*) set -- busybox timeout -s KILL -t 30 "$@";; *) set -- busybox timeout -s KILL 30 "$@";; esac
     (exec 9>&-;exec "$@")
 }
 verify() { actual=$(sha256sum "$1" | awk '{print $1}');[ "$actual" = "$2" ]; }
@@ -169,7 +169,7 @@ install_core() {
     archive=${3:-}
     if [ -z "$archive" ];then DOWNLOAD=$DIR/.download-$$;archive=$DOWNLOAD;curl -fL --retry 2 --connect-timeout 15 --max-time 600 -o "$archive" "$URL" || fail '下载失败，可指定本地官方压缩包重试';fi
     [ -f "$archive" ] && verify "$archive" "$HASH" || fail '压缩包 SHA-256 不符，未替换程序'
-    STAGE=$(mktemp -d "$DIR/.stage.XXXXXX")
+    STAGE=$(busybox mktemp -d "$DIR/.stage.XXXXXX")
     case "$NAME" in
     sing-box) tar -xzOf "$archive" "$MEMBER" >"$STAGE/sing-box" ;;
     mihomo) gzip -dc "$archive" >"$STAGE/mihomo" ;;
@@ -200,7 +200,7 @@ status) if running;then echo "running pid=$PID";else echo stopped;fi ;;
 config)
     [ "$NAME" != tailscale ] || fail 'Tailscale 使用自己的登录与状态文件'
     storage_ready;input=${3:-};[ -f "$input" ] || fail '请指定配置文件'
-    STAGE=$(mktemp -d "$DIR/.stage.XXXXXX");cp "$input" "$STAGE/config.$([ "$NAME" = sing-box ] && echo json || echo yaml)"
+    STAGE=$(busybox mktemp -d "$DIR/.stage.XXXXXX");cp "$input" "$STAGE/config.$([ "$NAME" = sing-box ] && echo json || echo yaml)"
     candidate=$STAGE/config.$([ "$NAME" = sing-box ] && echo json || echo yaml)
     check_config "$CURRENT" "$candidate" || fail '候选配置检查失败，当前配置保留'
     [ ! -f "$CONF" ] || cp -p "$CONF" "$CONF.previous"
@@ -209,7 +209,7 @@ migrate)
     [ "$NAME" = sing-box ] || fail '自动字段迁移仅用于 Sing-box；Mihomo 继续使用原 YAML 配置'
     storage_ready;input=${3:-};[ -f "$input" ] || fail '请指定原配置文件'
     lua -v >/dev/null 2>&1 || fail '此固件未包含 Lua；请在 Ubuntu 执行随源码提供的迁移工具，再导入结果'
-    STAGE=$(mktemp -d "$DIR/.stage.XXXXXX");candidate=$STAGE/config.json
+    STAGE=$(busybox mktemp -d "$DIR/.stage.XXXXXX");candidate=$STAGE/config.json
     lua /etc_ro/optional-net/sing-box-migrate.lua "$input" >"$candidate" || fail '配置无法安全自动迁移，原文件保留'
     check_config "$CURRENT" "$candidate" || fail '迁移结果未通过当前核心检查，原文件保留'
     mv "$candidate" "$DIR/config.migrated.json";echo "$DIR/config.migrated.json：已生成并校验，尚未导入或重启" ;;

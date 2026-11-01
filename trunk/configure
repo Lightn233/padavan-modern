@@ -144,6 +144,17 @@ if [ "$CONFIG_FIRMWARE_INCLUDE_WIREGUARD" = "y" ]; then
 else
 	func_disable_kernel_param "CONFIG_WIREGUARD"
 fi
+# 基础访客和设备限速的依赖，采用模块，未启用限速时不加载。
+func_enable_kernel_param "CONFIG_NET_SCHED"
+func_enable_kernel_param "CONFIG_NET_CLS"
+func_enable_kernel_param "CONFIG_NET_CLS_ACT"
+func_enable_kernel_param "CONFIG_NET_SCH_HTB" "m"
+func_enable_kernel_param "CONFIG_NET_SCH_TBF" "m"
+func_enable_kernel_param "CONFIG_NET_SCH_INGRESS" "m"
+func_enable_kernel_param "CONFIG_NET_CLS_U32" "m"
+func_enable_kernel_param "CONFIG_NET_ACT_MIRRED" "m"
+func_enable_kernel_param "CONFIG_NET_SCH_FQ_CODEL"
+func_enable_kernel_param "CONFIG_IFB" "m"
 # SQM QOS
 if [ "$CONFIG_FIRMWARE_INCLUDE_SQM" = "y" ]; then
 	func_enable_kernel_param "CONFIG_NF_CONNTRACK_EVENTS"

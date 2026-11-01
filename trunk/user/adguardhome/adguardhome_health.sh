@@ -1,6 +1,7 @@
 #!/bin/sh
 # 检查真实 DNS 应答；故障计数和重试预算只保存在 RAM。
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 STATE=${ADG_STATE_DIR:-/tmp/adguardhome-state}
 NET=${ADG_NET_HELPER:-/usr/bin/adguardhome-net}
 SERVICE=${ADG_SERVICE_SCRIPT:-/usr/bin/adguardhome.sh}
@@ -132,7 +133,7 @@ maintain_ra()
 }
 tick()
 {
-    [ -n "$TEST" ] || [ ! -d /tmp/.adguardhome_service_lock ] || return 0
+    [ -n "$TEST" ] || lockdir_available /tmp/.adguardhome_service_lock || return 0
     read_input
     case "$now" in ''|*[!0-9]*) return 2 ;; esac
     if [ "$enabled" != 1 ] || [ -e "$STATE/manual-stop" ]; then

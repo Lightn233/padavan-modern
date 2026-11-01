@@ -3182,58 +3182,69 @@ static int ej_get_nvram_list(int eid, webs_t wp, int argc, char **argv) {
 	return 0;
 }
 
+/* The client table is read as JavaScript by both full and incremental pages. */
+static void write_client_field(webs_t wp, const char *value)
+{
+	const unsigned char *p = (const unsigned char *)value;
+	if (!*p) {
+		websWrite(wp, "null");
+		return;
+	}
+	websWrite(wp, "\"");
+	for (; *p; p++) {
+		if (*p == '\\' || *p == '"')
+			websWrite(wp, "\\%c", *p);
+		else if (*p < 0x20 || *p == '<' || *p == '>' || *p == '&')
+			websWrite(wp, "\\u%04x", *p);
+		else
+			websWrite(wp, "%c", *p);
+	}
+	websWrite(wp, "\"");
+}
+
 // for detect static IP's client.
 static int ej_get_static_client(int eid, webs_t wp, int argc, char **argv)
 {
 	FILE *fp;
-	char buf[512], *head, *tail, field[512];
-	int i, lock, len, first_client, first_field;
+	char buf[512], *head, *fields[6];
+	int i, lock, first_client = 1;
+	size_t len;
 
 	lock = file_lock("networkmap");
-
-	first_client = 1;
 	fp = fopen("/tmp/static_ip.inf", "r");
 	if (fp) {
 		while (fgets(buf, sizeof(buf), fp)) {
-			if (first_client)
-				first_client = 0;
-			else
-				websWrite(wp, ", ");
-			
 			len = strlen(buf);
-			buf[len-1] = ',';
-			head = buf;
-			first_field = 1;
-			for (i = 0; i < 6; ++i) {
-				tail = strchr(head, ',');
-				if (tail != NULL) {
-					memset(field, 0, sizeof(field));
-					strncpy(field, head, (tail-head));
-				}
-				
-				if (first_field) {
-					first_field = 0;
-					websWrite(wp, "[");
-				} else
-					websWrite(wp, ", ");
-				
-				if (strlen(field) > 0)
-					websWrite(wp, "\"%s\"", field);
-				else
-					websWrite(wp, "null");
-				
-				head = tail+1;
-				
-				if (i == 5)
-					websWrite(wp, "]");
+			if (len == sizeof(buf) - 1 && buf[len - 1] != '\n') {
+				/* Discard the rest too; it is not a separate client. */
+				int ch;
+				while ((ch = fgetc(fp)) != '\n' && ch != EOF) {}
+				continue;
 			}
+			buf[strcspn(buf, "\r\n")] = '\0';
+			head = buf;
+			for (i = 0; i < 6; i++) {
+				fields[i] = strsep(&head, ",");
+				if (!fields[i])
+					break;
+			}
+			/* Publish only complete records; keep empty names as null. */
+			if (i != 6 || head != NULL)
+				continue;
+			if (!first_client)
+				websWrite(wp, ", ");
+			first_client = 0;
+			websWrite(wp, "[");
+			for (i = 0; i < 6; i++) {
+				if (i)
+					websWrite(wp, ", ");
+				write_client_field(wp, fields[i]);
+			}
+			websWrite(wp, "]");
 		}
-		
 		fclose(fp);
 	}
-
 	file_unlock(lock);
-
 	return 0;
 }
 
@@ -4221,6 +4232,8 @@ static char mentohust_log_txt[] =
 
 #endif
 
+#include "bandwidth_http.h"
+
 #if defined(APP_ADGUARDHOME)
 #include "adguardhome_backup_http.h"
 #include "adguardhome_status_http.h"
@@ -4231,6 +4244,7 @@ static char mentohust_log_txt[] =
 #endif
 
 struct mime_handler mime_handlers[] = {
+    { "bandwidth.asp", "application/json", no_cache_IE, do_bandwidth_post, do_bandwidth, 1 },
     { "system_status.json*|internet_status.json*", "application/json", no_cache_IE, NULL, do_ej, 1 },
     { "operation_status.json*", "application/json", no_cache_IE, NULL, do_ui_status, 1 },
 #if defined(APP_DDNS_GO)

@@ -71,14 +71,15 @@
   var memory=memorySample(data.ram),r=resources;
   textAt('cpu_info',cpu?percent(cpu.busy):'采样中');
   textAt('mem_info',memory?memorySize(memory.free)+' / '+memorySize(memory.total):'暂不可用');
+  // 普通设置页保留概览数值；只有首页和系统信息页创建详细面板。
+  var loads=typeof data.lavg==='string'?data.lavg.trim().split(/\s+/):[],loadHost=document.getElementById('la_info');if(loadHost)loadHost.replaceChildren();
+  [0,1,2].forEach(function(i){var valid=/^\d+(?:\.\d+)?$/.test(loads[i]||''),text=valid?loads[i]:'—';if(r)r.loadValues[i].textContent=text;if(loadHost){var chip=node('span','ui-load-chip',text);chip.title=[1,5,15][i]+' 分钟平均负载';chip.setAttribute('aria-label',chip.title+' '+text);chip.appendChild(node('small','',[1,5,15][i]+' 分'));loadHost.appendChild(chip);}});
   if(!r)return;
   r.brief.textContent='CPU '+(cpu?percent(cpu.busy):'采样中')+' · 内存'+(memory?'已分配 '+percent(memory.used*100/memory.total):'暂不可用');
   r.cpuNumber.textContent=cpu?percent(cpu.busy):'—';r.cpuCaption.textContent=cpu?'整机使用率':'等待两次有效采样';r.idle.textContent='空闲 '+(cpu?percent(cpu.idle):'—');
   r.cpuFill.style.width=cpu?cpu.busy+'%':'0%';r.cpuBar.classList.toggle('ui-resource-unavailable',!cpu);
   r.cpuBar.setAttribute('aria-valuetext',cpu?'CPU 使用率 '+percent(cpu.busy):'等待两次有效采样');if(cpu)r.cpuBar.setAttribute('aria-valuenow',cpu.busy.toFixed(1));else r.cpuBar.removeAttribute('aria-valuenow');
   cpuParts.forEach(function(item){var row=r.cpuRows[item[0]];row.value.textContent=cpu?percent(cpu[item[0]]):'—';if(item[0]==='other')row.row.hidden=!cpu||cpu.other<.05;});
-  var loads=typeof data.lavg==='string'?data.lavg.trim().split(/\s+/):[],loadHost=document.getElementById('la_info');if(loadHost)loadHost.replaceChildren();
-  r.loadValues.forEach(function(value,i){var valid=/^\d+(?:\.\d+)?$/.test(loads[i]||''),text=valid?loads[i]:'—';value.textContent=text;if(loadHost){var chip=node('span','ui-load-chip',text);chip.title=[1,5,15][i]+' 分钟平均负载';chip.setAttribute('aria-label',chip.title+' '+text);chip.appendChild(node('small','',[1,5,15][i]+' 分'));loadHost.appendChild(chip);}});
   r.memoryNumber.textContent=memory?percent(memory.used*100/memory.total):'—';r.memoryCaption.textContent=memory?'已分配 '+memorySize(memory.used)+'（含缓存）':'等待有效内存数据';r.memoryTotal.textContent=memory?'总量 '+memorySize(memory.total):'总量 —';
   var memoryLabel=[];memoryParts.forEach(function(item){var key=item[0],part=memory?memory[key]*100/memory.total:0;r.memorySegments[key].style.width=part+'%';r.memoryRows[key].value.replaceChildren(node('span','',memory?memorySize(memory[key]):'—'),node('small','',memory?percent(part):'—'));if(memory)memoryLabel.push(item[1]+' '+memorySize(memory[key]));});
   r.memoryBar.setAttribute('aria-label',memory?'内存分布：'+memoryLabel.join('，'):'内存数据暂不可用');
@@ -96,7 +97,7 @@
   if(!data||!data.cpu||!data.ram||!data.uptime)return false;
   var now=Date.now(),cpu=previousCpu&&now-previousCpuAt<15000?cpuSample(data.cpu,previousCpu):null;
   previousCpu=Object.assign({},data.cpu);previousCpuAt=now;root.sysinfo=data;root.si_new=data;
-  root.showSystemInfo(cpu,1);lastResourceUpdate=new Date(now).toLocaleTimeString('zh-CN',{hour12:false});
+  root.showSystemInfo(cpu,1);if(typeof root.show_middle_status==='function')root.show_middle_status();lastResourceUpdate=new Date(now).toLocaleTimeString('zh-CN',{hour12:false});
   resourceStatus('更新于 '+lastResourceUpdate+' · 约每 2.5 秒刷新'+(!cpu?' · CPU 采样中':''),false);return true;
  };
  root.show_banner=function(){
@@ -114,7 +115,8 @@
   if(enabledBtnCommit.indexOf('none')<0)commands.appendChild(action('<#CTL_Commit#>',function(){commit();},'commit_btn'));
   commands.append(action('<#BTN_FREEMEMORY#>',function(){freememory();},'freememory_trash'),action('<#BTN_REBOOT#>',function(){reboot();},'reboto_btn'),action('<#t1Logout#>',function(){logout();},'logout_btn'));
   strip.append(radios,commands);host.appendChild(strip);
-  mountResources(host);
+  // 设置页保留顶部概览，详细资源面板只放在首页和系统信息页。
+  if(/^\/(?:index\.asp|Advanced_System_Info\.asp)?$/.test(location.pathname))mountResources(host);
   if(log_float!=='0'){
    var panel=node('section','syslog_panel'),toggle=action('运行日志',function(){var open=panel.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));if(open)setLogData();},'syslog_panel_button');toggle.classList.add('handle');toggle.setAttribute('aria-expanded','false');
    var head=node('div','ui-log-head');head.append(node('strong','','系统日志'),action('<#CTL_clear#>',function(){clearlog();},'clearlog_btn'),action('关闭',function(){panel.classList.remove('open');toggle.setAttribute('aria-expanded','false');}));
@@ -122,6 +124,8 @@
    var area=node('textarea');area.id='log_area';area.readOnly=true;area.rows=12;area.setAttribute('aria-label','系统日志');panel.append(toggle,head,area);host.appendChild(panel);updateClock();
   }
   show_loading_obj();show_top_status();
+  // 首次进入也要启动联网轮询，不能只在切回标签页或关闭等待框时触发。
+  clearTimeout(id_check_status);id_check_status=setTimeout(get_changed_status,1000);
  };
  root.show_top_status=function(){
   previousCpu=root.sysinfo&&root.sysinfo.cpu?Object.assign({},root.sysinfo.cpu):null;previousCpuAt=Date.now();root.showSystemInfo(null,0);
@@ -136,7 +140,11 @@
  root.get_changed_status=function(){
   clearTimeout(id_check_status);if(stopped||document.hidden||internetRequest)return;
   internetRequest=jq.ajax({url:'/internet_status.json',dataType:'json',cache:false,timeout:6000});
-  internetRequest.done(function(data){if(data){notify_status_internet(String(data.internet));notify_status_vpn_client(String(data.vpn));}}).always(function(){internetRequest=null;if(!stopped&&!document.hidden)id_check_status=setTimeout(get_changed_status,5000);});
+  internetRequest.done(function(data){
+   if(data&&/^[012]$/.test(String(data.internet)))notify_status_internet(String(data.internet));
+   else if(typeof root.showMapWANStatus==='function')root.showMapWANStatus(null);
+   if(data&&/^[01]$/.test(String(data.vpn)))notify_status_vpn_client(String(data.vpn));
+  }).fail(function(xhr,status){if(status!=='abort' && typeof root.showMapWANStatus==='function')root.showMapWANStatus(null);}).always(function(){internetRequest=null;if(!stopped&&!document.hidden)id_check_status=setTimeout(get_changed_status,5000);});
  };
  root.show_loading_obj=function(){var host=document.getElementById('Loading');if(host)host.replaceChildren();};
  root.logout=function(){UI.confirm('<#JS_logout#>',{title:'退出管理',accept:'退出登录'}).then(function(ok){if(ok){UI.dirty(false);location.href='/Logout.asp';}});};

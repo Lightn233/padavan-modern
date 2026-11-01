@@ -28,33 +28,34 @@ typedef enum {
 
 static int ignore_result(dbclient *client);
 
+static unsigned long long db_msec(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (unsigned long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
 static int write_util(dbclient* client, int len, unsigned int delay) {
-    int n, writed_len = 0;
-    unsigned int now, timeout;
-    struct timeval tv, tv2;
-
-    gettimeofday(&tv2, NULL); timeout = (tv2.tv_sec*1000) + (tv2.tv_usec/1000) + delay;
-    while(writed_len < len) {
-        n = write(client->remote_fd, client->buf + writed_len, len - writed_len);
-        if(n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                gettimeofday(&tv, NULL);
-                now = (tv.tv_sec*1000) + (tv.tv_usec/1000);
-                if(now > timeout) {
-                    break;
-                }
-
-                usleep(50);
-            }
-        }
-
-        writed_len += n;
-    }
-
-    if(writed_len != len) {
+    int n, written = 0;
+    unsigned long long start = db_msec();
+    if (client->remote_fd < 0 || len < 0 || !client->buf || len > client->buf_max)
         return -1;
+    while (written < len) {
+        if (db_msec() - start >= delay)
+            return -1;
+        n = send(client->remote_fd, client->buf + written, len - written, MSG_NOSIGNAL);
+        if (n > 0) {
+            written += n;
+            continue;
+        }
+        if (n == 0)
+            return -1;
+        if (errno == EINTR)
+            continue;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            return -1;
+        usleep(50);
     }
-
     return 0;
 }
 
@@ -80,24 +81,28 @@ static int create_client_fd(char* sock_path) {
     return remote_fd;
 }
 
-static void check_buf(dbclient* client, int len) {
-    int clen = _max(len, BUF_MAX);
-
-    if((NULL != client->buf) && (client->buf_max < clen)) {
-        free(client->buf);
-        client->buf = NULL;
-    }
-
-    if(NULL == client->buf) {
-        client->buf = (char*)malloc(clen+1);
-        client->buf_max = clen;
-    }
+static int check_buf(dbclient* client, int len) {
+    int clen;
+    char *next;
+    if (len < 0 || len > READ_MAX)
+        return -1;
+    clen = _max(len, BUF_MAX);
+    if (client->buf && client->buf_max >= clen)
+        return 0;
+    next = realloc(client->buf, (size_t)clen + 1);
+    if (!next)
+        return -1;
+    client->buf = next;
+    client->buf_max = clen;
+    return 0;
 }
 
 static int setnonblock(int fd) {
     int flags;
 
     flags = fcntl(fd, F_GETFL);
+    if (flags < 0)
+        return -1;
     flags |= O_NONBLOCK;
     return fcntl(fd, F_SETFL, flags);
 }
@@ -137,20 +142,28 @@ int dbclient_start(dbclient* client) {
         }
     }
 
-    setnonblock(client->remote_fd);
+    if (setnonblock(client->remote_fd) < 0) {
+        close(client->remote_fd);
+        client->remote_fd = -1;
+        return -1;
+    }
     return 0;
 }
 
 int dbclient_bulk(dbclient* client, const char* command, const char* key, int nk, const char* value, int nv) {
     int n1,n2,nc;
 
+    if (!command || !key || !value || strlen(command) > READ_MAX)
+        return -1;
     nc = strlen(command);
-    if(nk < 0 || nv < 0) {
+    if(nk < 0 || nv < 0 || nk > READ_MAX || nv > READ_MAX ||
+       nc + nk + nv + 3 > READ_MAX - HEADER_PREFIX) {
         return -1;
     }
 
     n1 = nc + nk + nv + 3;// replace key value\n
-    check_buf(client, n1 + HEADER_PREFIX);
+    if (check_buf(client, n1 + HEADER_PREFIX) < 0)
+        return -1;
     n2 = sprintf(client->buf, "%s%07d %s ", MAGIC, n1, command);
 
     memcpy(client->buf + n2, key, nk);
@@ -164,53 +177,35 @@ int dbclient_bulk(dbclient* client, const char* command, const char* key, int nk
     client->buf[n2] = '\0';
 
     if(0 == write_util(client, n1 + HEADER_PREFIX, 200)) {
-        ignore_result(client);
-        return 0;
+        return ignore_result(client);
     }
 
     return -1;
 }
 
 static int read_util(dbclient* client, int len, unsigned int delay) {
-    int clen, n;
-    unsigned int now, timeout;
-    struct timeval tv,  tv2;
-
-    check_buf(client, len);
-    gettimeofday(&tv2, NULL);
-    timeout = (tv2.tv_sec * 1000) + (tv2.tv_usec / 1000) + delay;
+    int n;
+    unsigned long long start = db_msec();
+    if (client->remote_fd < 0 || check_buf(client, len) < 0)
+        return -1;
     client->buf_pos = 0;
-
-    for(;;) {
-        clen = len - client->buf_pos;
-        n = recv(client->remote_fd, client->buf + client->buf_pos, clen, 0);
-        if(n < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                gettimeofday(&tv, NULL);
-                now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-                if(now > timeout) {
-                    break;
-                }
-
-                usleep(50);
-                continue;
-            }
-            //timeout
-            return -2;
-        } else if(n == 0) {
-            //socket closed
-            return -1;
-        } else {
+    while (client->buf_pos < len) {
+        if (db_msec() - start >= delay)
+            return -3;
+        n = recv(client->remote_fd, client->buf + client->buf_pos, len - client->buf_pos, 0);
+        if (n > 0) {
             client->buf_pos += n;
-            if(client->buf_pos == len) {
-                //read ok
-                return 0;
-            }
+            continue;
         }
+        if (n == 0)
+            return -1;
+        if (errno == EINTR)
+            continue;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            return -2;
+        usleep(50);
     }
-
-    //unkown error
-    return -3;
+    return 0;
 }
 
 static int ignore_result(dbclient *client) {
@@ -275,8 +270,12 @@ static int parse_list_result(dbclient *client, char* prefix, webs_t wp, fn_db_pa
             break;
         }
 
+        if (n2 <= LIST_LEN || strncmp(client->buf, "list ", LIST_LEN) != 0)
+            return -4;
         p1 = client->buf + LIST_LEN;
-        p2 = strstr(p1, " ");
+        p2 = strchr(p1, ' ');
+        if (!p2 || p2 == p1)
+            return -4;
         *p2 = '\0';
         p2++;
         if(client->buf[n2-1] == '\n') {
@@ -293,8 +292,11 @@ static int parse_list_result(dbclient *client, char* prefix, webs_t wp, fn_db_pa
 int dbclient_list(dbclient* client, char* prefix, webs_t wp, fn_db_parse fn) {
     int n1, n2;
 
+    if (!prefix || !fn || strlen(prefix) > READ_MAX - HEADER_PREFIX - 6)
+        return -1;
     n1 = strlen("list") + strlen(prefix) + 2;//list prefix\n
-    check_buf(client, n1 + HEADER_PREFIX);
+    if (check_buf(client, n1 + HEADER_PREFIX) < 0)
+        return -1;
     n2 = sprintf(client->buf, "%s%07d list %s\n", MAGIC, n1, prefix);
     if(0 != write_util(client, n1 + HEADER_PREFIX, 100)) {
         return -1;
@@ -304,12 +306,12 @@ int dbclient_list(dbclient* client, char* prefix, webs_t wp, fn_db_parse fn) {
 }
 
 int dbclient_end(dbclient* client) {
-    if(NULL != client->buf) {
-        free(client->buf);
-    }
-    if((-1 != client->remote_fd) && (0 != client->remote_fd)) {
+    free(client->buf);
+    client->buf = NULL;
+    client->buf_max = client->buf_pos = 0;
+    if (client->remote_fd >= 0)
         close(client->remote_fd);
-    }
+    client->remote_fd = -1;
 
     return 0;
 }

@@ -215,23 +215,12 @@ sig_exit(int sig)
 static void
 net_clients_reset(void)
 {
-	FILE *fp;
 	int lock;
 
-	// reset exist ip table
+	/* 扫描只清空工作表，保留上次完整结果供新打开的页面读取。 */
 	lock = file_lock("networkmap");
 
 	net_clients_release();
-
-	fp = fopen("/tmp/static_ip.inf", "w");
-	if (fp)
-		fclose(fp);
-
-	fp = fopen("/tmp/static_ip.num", "w");
-	if (fp) {
-		fprintf(fp, "%u", 0);
-		fclose(fp);
-	}
 
 	file_unlock(lock);
 
@@ -246,6 +235,10 @@ net_clients_update(void)
 	int lock;
 	struct in_addr in;
 	unsigned int vcount;
+
+	/* 完成前不发布空表或半份结果；完成后统一替换，离线设备不会永久残留。 */
+	if (networkmap_fullscan)
+		return;
 
 	lock = file_lock("networkmap");
 
@@ -658,6 +651,7 @@ nmap_iterate(void)
 			setsockopt(arp_sockfd, SOL_SOCKET, SO_RCVTIMEO, &arp_timeout, sizeof(arp_timeout));
 			
 			networkmap_fullscan = 0;
+			net_clients_update();
 			
 			nvram_set_int_temp("networkmap_fullscan", 0);
 			

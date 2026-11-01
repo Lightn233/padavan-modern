@@ -327,27 +327,15 @@ BOOLEAN a4_proxy_lookup(
 	OUT UCHAR *wcid
 )
 {
-#ifdef WAPP_SUPPORT
-	UINT8 ip[4] = {0};
-#endif
-
 	*wcid = 0;
 
 	if (a4_get_entry_count(adapter, if_index) == 0) {
-#ifdef WAPP_SUPPORT
-		if (!is_rx && a4_get_dst_ip(mac_addr, ip))
-			wapp_send_a4_entry_missing(adapter, if_index, ip);
-#endif
 		return FALSE;
 	}
 
 	if (RoutingTabLookup(adapter, if_index, mac_addr, update_alive_time, wcid) != NULL)
 		return TRUE;
 	else {
-#ifdef WAPP_SUPPORT
-		if (!is_rx && a4_get_dst_ip(mac_addr, ip))
-			wapp_send_a4_entry_missing(adapter, if_index, ip);
-#endif
 		return FALSE;
 	}
 }
@@ -713,7 +701,7 @@ INT Set_APProxy_Status_Show_Proc(
 							routing_entry->Retry, ROUTING_ENTRY_MAX_RETRY));
 				}
 
-				MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("Total Count = %d\n\n", count));
+				MTWF_LOG(DBG_CAT_ALL, DBG_SUBCAT_ALL, DBG_LVL_OFF, ("Total Count = %d\n", count));
 			}
 		}
 	}

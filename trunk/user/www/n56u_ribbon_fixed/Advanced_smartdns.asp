@@ -23,6 +23,7 @@
 <script src="/ui/state-modern.js?v=1"></script>
 <script type="text/javascript" src="/general.js"></script>
 <script type="text/javascript" src="/popup.js"></script>
+<script type="text/javascript" src="/help.js"></script>
 <script>
 var $j = jQuery.noConflict();
 <% smartdns_status(); %>
@@ -135,8 +136,8 @@ function markGroupRULES(o, c, b) {
 			return false;
 		}else if(document.form.sdnss_name_x_0.value==""){
 			alert("<#JS_fieldblank#>");
-			document.form.sdnss_name_0.focus();
-			document.form.sdnss_name_0.select();
+			document.form.sdnss_name_x_0.focus();
+			document.form.sdnss_name_x_0.select();
 			return false;
 		}else{
 			for(i=0; i<m_list.length; i++){
@@ -150,8 +151,8 @@ function markGroupRULES(o, c, b) {
 				}
 				if(document.form.sdnss_name_x_0.value.value==m_list[i][1]) {
 					alert('<#JS_duplicate#>' + ' (' + m_list[i][1] + ')' );
-					document.form.sdnss_name_0.focus();
-					document.form.sdnss_name_0.select();
+					document.form.sdnss_name_x_0.focus();
+					document.form.sdnss_name_x_0.select();
 					return false;
 				}
 			}
@@ -400,8 +401,8 @@ function showMRULESList(){
                                                 <div><span style="color:#888;">0为禁用缓存功能</span></div>
                                             </td>
                                         </tr>
-                                        </tr>
-											<th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,3,3);">缓存持久化服务功能</a></th>
+                                        <tr>
+											<th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,27,3);" onclick="openTooltip(this,27,3);return false;"><#SDNS_Persist#></a></th>
 											<td>
                                                 <div class="main_itoggle">
                                                 <div id="sdns_cache_persist_on_of">
@@ -420,7 +421,7 @@ function showMRULESList(){
                                                 <div><span style="color:#888;">单位：秒，需大于0的数字</span></div>
                                             </td>
                                         </tr>
-										<tr> <th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,3,1);">缓存更新阈值</a></th>
+										<tr> <th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,27,1);" onclick="openTooltip(this,27,1);return false;"><#SDNS_MinTTL#></a></th>
                                             <td>
                                                 <input type="text" maxlength="64" class="input" size="15" name="sdns_ttl_min" style="width: 200px" value="<% nvram_get_x("", "sdns_ttl_min"); %>">
 												<div><span style="color:#888;">单位：秒，需大于0的数字</span></div>
@@ -434,7 +435,7 @@ function showMRULESList(){
                                         </tr>
 										<tr>
 										     <th>
-										     <a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this, 3, 2);">域名预先获取功能</a></th>
+										     <a class="help_tooltip" href="javascript: void(0)" onmouseover="openTooltip(this,27,2);" onclick="openTooltip(this,27,2);return false;"><#SDNS_Prefetch#></a></th>
                                              <td>
                                                 <div class="main_itoggle">
                                                 <div id="sdns_www_on_of">
@@ -446,7 +447,7 @@ function showMRULESList(){
                                                 </div>
                                             </td>
                                         </tr>
-										<tr> <th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,3,4);">过期缓存服务功能</a></th>
+										<tr> <th><a class="help_tooltip"  href="javascript:void(0);" onmouseover="openTooltip(this,27,4);" onclick="openTooltip(this,27,4);return false;"><#SDNS_Expired#></a></th>
                                             <td>
                                                 <div class="main_itoggle">
                                                 <div id="sdns_exp_on_of">
@@ -458,16 +459,16 @@ function showMRULESList(){
                                                 </div>
                                             </td>
                                         </tr>
-										<tr> <th>过期缓存回应阈值</th>
+										<tr> <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,27,5);" onclick="openTooltip(this,27,5);return false;"><#SDNS_ExpiredTTL#></a></th>
                                             <td>
                                                 <input type="text" maxlength="64" class="input" size="15" name="sdns_exp_ttl" style="width: 200px" value="<% nvram_get_x("", "sdns_exp_ttl"); %>">
-												<div><span style="color:#888;">失效不足此时长的过期缓存可用。0为不限时</span></div>
+												<div><span style="color:#888;"><#SDNS_ExpiredTTL_note#></span></div>
                                             </td>
                                         </tr>
-										<tr> <th>回应的过期缓存可用时间</th>
+										<tr> <th><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this,27,6);" onclick="openTooltip(this,27,6);return false;"><#SDNS_ReplyTTL#></a></th>
                                             <td>
                                                 <input type="text" maxlength="64" class="input" size="15" name="sdns_exp_ttl_max" style="width: 200px" value="<% nvram_get_x("", "sdns_exp_ttl_max"); %>">
-												<div><span style="color:#888;">过期缓存更新前的临时可用时间。0为不限时</span></div>
+												<div><span style="color:#888;"><#SDNS_ReplyTTL_note#></span></div>
                                             </td>
                                         </tr>
 										<tr> <th>加载ChnrouteIP为白名单</th>

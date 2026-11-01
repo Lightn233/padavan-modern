@@ -1244,7 +1244,17 @@ gen_ralink_config(int is_soc_ap, int is_aband, int disable_autoscan)
 	//HT_MpduDensity
 	i_val = nvram_wlan_get_int(is_aband, "HT_MpduDensity");
 	if (i_val < 0 || i_val > 7) i_val = 5;
-	fprintf(fp, "HT_MpduDensity=%d\n", i_val);
+	/* MT7615 按 BSS 读取列表，单值只设置主网；旧驱动保留原格式。 */
+	fprintf(fp, "HT_MpduDensity=%d", i_val);
+#if defined(USE_WID_5G) && (USE_WID_5G == 7615)
+	if (is_aband)
+		fprintf(fp, ";%d", i_val);
+#endif
+#if defined(USE_WID_2G) && (USE_WID_2G == 7615)
+	if (!is_aband)
+		fprintf(fp, ";%d", i_val);
+#endif
+	fputc('\n', fp);
 
 	// HT_EXTCHA
 	i_HTBW_MAX = 1;

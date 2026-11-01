@@ -21,6 +21,5 @@ $(eval $(call BuildPackage,iproute2))
 romfs:
 	$(INSTALL_DIR) $(ROMFSDIR)/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ip/ip $(ROMFSDIR)/bin/ip
-ifeq ($(CONFIG_FIRMWARE_INCLUDE_SQM),y)
+# 访客与设备限速也使用 tc，不再只随 SQM 插件打包。
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/tc/tc $(ROMFSDIR)/bin/tc
-endif

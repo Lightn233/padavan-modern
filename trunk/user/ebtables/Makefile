@@ -13,11 +13,16 @@ SRC_DIR:=./src
 
 CONFIGURE_ARGS += --enable-static --disable-shared
 
+# 扩展依靠构造函数注册，必须整库链接；同一个 -Wl 参数避免 Libtool 重排边界。
 MAKE_FLAGS += \
-	ebtables-legacy \
+	ebtables-legacy -W ebtables-standalone.o \
+	ebtables_legacy_LDADD="-Wl,--whole-archive,.libs/libebtc.a,--no-whole-archive" \
 	KERNEL_INCLUDES=$(KERNEL_HEADERS_PATH)
 
 $(eval $(call BuildPackage,ebtables))
+
+# 配方改变时重做链接，避免增量构建继续打包旧的损坏程序。
+$(STAMP_BUILT): Makefile
 
 romfs:
 	$(INSTALL_DIR) $(ROMFSDIR)/bin

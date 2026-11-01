@@ -17,6 +17,9 @@
 
 <script type="text/javascript" src="/jquery.js"></script>
 <script src="/ui/core.js?v=1"></script>
+<link rel="stylesheet" href="/ui/bandwidth.css?v=1">
+<script src="/ui/bandwidth.js?v=1"></script>
+
 
 
 <script type="text/javascript" src="/state.js"></script>
@@ -183,6 +186,7 @@ function change_guest_enabled(mflag) {
 	showhide_div('row_guest_11', v);
 	showhide_div('row_guest_12', v);
 	showhide_div('row_guest_13', v);
+	showhide_div('row_guest_bandwidth', v);
 }
 
 function change_guest_auth_mode(mflag) {
@@ -456,6 +460,7 @@ function change_guest_auth_mode(mflag) {
                                                 </div>
                                             </td>
                                         </tr>
+                                        <tr id="row_guest_bandwidth" style="display:none"><th>访客网络限速</th><td data-bandwidth-guest="2">正在读取限速状态…</td></tr>
                                     </table>
 
                                     <table class="table">

@@ -2,6 +2,7 @@
 # 只清理官方进程的内存缓存；调用者持有服务锁，不改配置、规则或持久数据。
 set -eu
 umask 077
+. "${RM_LOCK_LIBRARY:-/usr/libexec/lockdir.sh}"
 # AP 不执行缓存维护重启，返回延期而非伪报清理成功。
 [ "$(nvram get sw_mode)" != 3 ] || exit 1
 expected=${1:-}
@@ -32,7 +33,9 @@ healthy() {
 }
 [ -x "$net" ] && [ -x "$root/AdGuardHome" ] && [ ! -L "$root/AdGuardHome" ]
 [ -d "$lock" ] && [ "$(cat "$lock/pid")" = "$PPID" ]
-[ ! -d /tmp/adguardhome-hosts.lock ]
+# Metadata is not a lock: the parent must still hold the kernel lock.
+if lockdir_available "$lock"; then exit 1; fi
+lockdir_available /tmp/adguardhome-hosts.lock
 [ "$(nvram get adg_enable)" = 1 ] && [ ! -e "$state/manual-stop" ]
 no_update
 admin_idle
@@ -64,7 +67,7 @@ if [ -z "$new" ]; then
     no_update
     [ "$program_hash" = "$(digest "$root/AdGuardHome")" ] || exit 1
     [ "$(nvram get adg_enable)" = 1 ] && [ ! -e "$state/manual-stop" ]
-    nohup "$root/AdGuardHome" --config "$conf" --work-dir "$root" --logfile /tmp/AdGuardHome.log </dev/null >"$state/rdns-relaunch.log" 2>&1 &
+    nohup "$root/AdGuardHome" --config "$conf" --work-dir "$root" --logfile /tmp/AdGuardHome.log 8>&- 9>&- </dev/null >"$state/rdns-relaunch.log" 2>&1 &
     new=$!
 fi
 n=0

@@ -585,6 +585,9 @@ void stop_aldriver(void);
 void start_aldriver(void);
 void restart_aldriver(void);
 #endif
+int bandwidth_limits_requested(void);
+void restart_bandwidth_limits(void);
+void stop_bandwidth_limits(void);
 #if defined(APP_SQM)
 void stop_sqm(void);
 void start_sqm(void);
