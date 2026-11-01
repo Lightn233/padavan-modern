@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "production_functions_extracted": true,
+  "runs": [
+    {
+      "variant": "before",
+      "arch": "native",
+      "passed": true,
+      "stdout": "12 state/mode combinations; wake, sleep, pending FIFO, active retrieval and normal wake regression passed\n"
+    },
+    {
+      "variant": "before",
+      "arch": "mips",
+      "passed": true,
+      "stdout": "12 state/mode combinations; wake, sleep, pending FIFO, active retrieval and normal wake regression passed\n"
+    },
+    {
+      "variant": "candidate",
+      "arch": "native",
+      "passed": true,
+      "stdout": "12 state/mode combinations; wake, sleep, pending FIFO, active retrieval and normal wake regression passed\n"
+    },
+    {
+      "variant": "candidate",
+      "arch": "mips",
+      "passed": true,
+      "stdout": "12 state/mode combinations; wake, sleep, pending FIFO, active retrieval and normal wake regression passed\n"
+    }
+  ]
+}

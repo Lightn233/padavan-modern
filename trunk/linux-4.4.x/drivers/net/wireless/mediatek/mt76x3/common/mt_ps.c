@@ -411,6 +411,15 @@ BOOLEAN MtPsIndicate(RTMP_ADAPTER *pAd, UCHAR *pAddr, UCHAR wcid, UCHAR Psm)
 			DBGPRINT(RT_DEBUG_INFO | DBG_FUNC_PS, ("%s(%d): STA wakes up!\n", __FUNCTION__, __LINE__));
 			MtHandleRxPsPoll(pAd, pAddr, wcid, TRUE);
 		}
+#if defined(MT7603) && defined(RTMP_PCI_SUPPORT)
+		else if (tr_entry->ps_state == APPS_RETRIEVE_CR_PADDING)
+		{
+			/* The shared request register was busy; this station has not
+			 * started HW retrieval. Drain on wake without removing its
+			 * pending FIFO entry or permitting a duplicate request. */
+			MtHandleRxPsPoll(pAd, pAddr, wcid, TRUE);
+		}
+#endif
 		else
 			DBGPRINT(RT_DEBUG_INFO | DBG_FUNC_PS, ("%s(%d):wcid=%d, old_psmode=%d, now_psmode=%d, wrong ps_state=%d ???\n",
 					__FUNCTION__, __LINE__, wcid, old_psmode, Psm, tr_entry->ps_state));

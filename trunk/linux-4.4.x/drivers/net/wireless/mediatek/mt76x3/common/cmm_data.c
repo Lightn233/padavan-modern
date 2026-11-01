@@ -3168,7 +3168,14 @@ INT rtmp_deq_req(RTMP_ADAPTER *pAd, INT cnt, struct dequeue_info *info)
 		{	/* unicast */
 			if ((tr_entry->PsMode == PWR_SAVE)
 #ifdef MT_PS
-			||((tr_entry->ps_state != APPS_RETRIEVE_IDLE) && (tr_entry->ps_state != APPS_RETRIEVE_DONE))
+			|| ((tr_entry->ps_state != APPS_RETRIEVE_IDLE) &&
+			    (tr_entry->ps_state != APPS_RETRIEVE_DONE)
+#if defined(MT7603) && defined(RTMP_PCI_SUPPORT)
+			    /* PWR_SAVE remains blocked above. An awake station waiting
+			     * for another station's CR request has no retrieval to drain. */
+			    && (tr_entry->ps_state != APPS_RETRIEVE_CR_PADDING)
+#endif
+			   )
 #endif /* MT_PS */
 			)
 			{
